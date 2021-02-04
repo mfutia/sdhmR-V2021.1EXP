@@ -1,16 +1,11 @@
 ---
-title: "Exercise Title Goes Here"
+title: "Exercise 2"
 author: Eli Polzer, Mia McReynolds, Matt Futia
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
+
 ```{r global_options, include=FALSE}
 knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
 #knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
