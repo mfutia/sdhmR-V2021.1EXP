@@ -1,0 +1,120 @@
+---
+title: "Homework 2: The Consequences of Frame Selection"
+author: Eli Polzer, Mia McReynolds, Matt Futia
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+
+```{r global_options, include=FALSE}
+# knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+
+#Mia's directory
+knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
+
+knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+```
+
+---
+
+## This exercise links to Module 2.3.3
+
+Submit the completed exercise to us at:
+
+* t.edwards@usu.edu 
+* eric_tsakiris@fws.gov 
+
+---
+
+## Context
+
+The exercise explores the consequences of frame selection on numerical summaries of predictive variables.  The species being explored is [*Pinus edulis* Common piñon](https://www.conifers.org/pi/Pinus_edulis.php).  Feel free to refer to the illustrations in Module 2.3.2 for graphical context.
+
+## The Data
+
+* Load **`spp106.soil.Rdata`** and **`spp106.clim.Rdata`** (or import **`spp106.soil.csv`**, **`spp106.clim.csv`**)
+* Data in: **`~\sdhmR-V2020.2\data\module02`**
+
+```{r}
+# some libraries
+  library(raster)	# FXNS: extent, raster, res, rasterize, values, writeRaster, 
+					#       cellFromXY, extract
+  library(sf)    	# FXNS: st_as_sf, st_as_sfc, st_bbox, st_convex_hull, st_union
+					#       st_buffer, st_read, st_write, st_intersection, st_geometry,
+					#       st_drop_geometry, st_coordinates, st_sf
+  library(terra)	# FXNS: as.data.frame, rast, vect
+  library(readr)
+  library(ggplot2)
+
+#filepaths
+  path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
+  path.mod2 <- paste(path.root, "/data/module02", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+```
+
+
+---
+
+## Question #1
+
+* What are the expected consequences in terms of a SDHM classification model if differences between environmental variables measured at presence:absence sites are large vs. small?
+
+It's easier to build a reliable classification model based on environmental variables that vary dramatically between presence and absence sites. Large variation in environmental variables increases the discriminatory power of the model because they can provide a stronger signal:noise ratio. If environmental variables differ by a small amount between presence and absence sites, it's statistically harder to discriminate between weak differences in species' environmental preferences and noise (or, natural variation in the data). 
+
+---
+
+## Question #2
+
+* How might these differing frames, and their respective variable differences based on the presence or absence of the species, affect: 
+  * (i) ecological interpretations, and 
+  * (ii) their classification ability, of variables?
+
+i) Ecological interpretations are affected because the frames have different spatial extents and data sources, which can limit research questions and comparisons between sites. Using a modelling frame with a larger spatial extent that covers a greater range of variables allow findings from the model to be extrapolated to a wider range of ecological conditions. Some of the frames were guided by previous research, which should be reflected in the model objectives and interpretation. For example, an SDHM could investigate current tree distribution within the extent of trees documented by Little. Since this SDHM is built from a distribution that these trees were shown to occupy, the range of variables is narrower and will under-represent conditions associated with absence of the species. 
+
+ii) As described above, variables that have small ranges are less powerful in classification. Classification ability is affected because these frames vary in the range of environmental variables -- for example, the dry desert plus Little's framework has the smallest variation in elevation between presence/absence sites. 
+
+---
+
+## Question #3
+
+* How do you decide which frame -- given many competing -- is appropriate for SDHM construction?
+
+Your intended use statement can help you make a judgment call in selecting a frame. You should consider the extent and density of available data sources, as well as the spatial extent to which you want to apply the model. It's important to document your analysis decisions, and make defensible choices that build on previous work in your field. 
+
+---
+
+## Question #4
+
+* Examine variable names and select 3 for all subsequent questions.  Identify them below in your answer to this question.
+
+It's really hard to interpret the names in spp clim, so I'll use some of the spp soil variables. avc_wtavg may be average water content, weighted average. Clay is the clay % in soil. Frag3 to 10 is a measurement of grain size that shows rock fragments through a No. 10 sieve. 
+
+---
+
+## Question #5
+
+* Run some simple descriptive statistics (ie, $\bar{x}$, $SD$) on the three (3) selected variables from above and compare across frames (where 1=inside frame; 0=outside): 
+* There are four (4) frames to evaluate:
+  * Western U.S. states; this frame is defined as the entire dataframe N
+  * **`$dry.domfr`** = all *edulis* within the dry domain
+  * **`$SPPRES106.fiafr`** = buffered *edulis* distribution based on FIA data points
+  * **`$SPPRES106.cmbfr`** = buffered *edulis* distribution based on FIA data points plus the UNION with [Little’s mapped tree distributions](https://www.fs.fed.us/database/feis/pdfs/Little/aa_SupportingFiles/LittleMaps.html).
+  
+---
+  
+## Question #6
+
+* Build box plots with the 4 frames by variable for each of your selected variable, ie this will be 3 variables $\times$ 4 different frames.
+
+---
+
+## Question #7: 
+
+* Identify which of the variables that subjectively (No statistical tests here, please!Just your Mark I eyeballs.) look as though they would discriminate between presence and absence
+
+---
+
+## The End
+
+---
