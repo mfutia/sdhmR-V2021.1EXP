@@ -1,6 +1,6 @@
 ---
 title: "Exercise 2"
-author: Eli Polzer, Mia McReynolds, Matt Futia
+author: "Eli Polzer, Mia McReynolds, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
@@ -21,7 +21,6 @@ Submit the completed exercise to us at:
 * t.edwards@usu.edu 
 * eric_tsakiris@fws.gov 
 
-ok
 ---
 
 ## Context
