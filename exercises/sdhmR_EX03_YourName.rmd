@@ -1,0 +1,101 @@
+---
+title: "Exercise Title Goes Here"
+author: "Your Name Goes Here"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+<!-- These are global options  
+       set root directory here 
+       NOTE mine is active; yours is commented out
+       change the path to reflect your CPU,
+       then comment out or delete mine
+--> 
+```{r global_options, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+```
+
+---
+
+## This exercise links to Module 2.3.4
+
+Submit the completed exercise to us at:
+
+* t.edwards@usu.edu 
+* eric_tsakiris@fws.gov 
+
+---
+
+## Context
+
+The Uinta Basin hookless cactus (*Sclerocactus wetlandicus*) (SCWE) is listed as a threatened species.  Recovery goals require:
+* An accurate range map;
+* Comprehensive surveys on locations; and
+* Other needs as well
+[FWS ECOS](https://ecos.fws.gov/ecp/species/9037) has an expert opinion-based "blob" of an hypothetical SCWE modelling (ie, the "blob") domain.
+
+## The Data
+
+* Acquire from the ECOS site the SCWE "blob" shapefile (call it: scwe_ecospoly) 
+* Import the **`scwe_pres.csv`** file of known SCWE presence points
+* Data in: **`~\sdhmR-V2020.2\data\gis_layers`** and **`...\module02`**, respectively
+
+---
+
+## Question #1
+
+* Import the ECOS--acquired SCWE "blob" as a spatial object (call it: **`scwe_ecospoly`**)
+* Find and acquire the **`CRS epsg:42303`** and it's **`proj4string`** – this is the CRS for ALL subsequent analyses
+* Set CRS of (i) the ECOS "blob" and (ii) the imported points to epsg:42303
+* Plot the presence points relative to the ECOS-based polygon "blob"
+
+```{r}
+# code for the question goes inside chunks, if part of the exercise solution.
+#  If not part of the exercise questions delete this.
+#  NOTE: do NOT answer all questions from within the same chunk
+```
+
+**YET ANOTHER NOTE RELATED TO CODE:**  
+If King's English interpretation is required, it will go here, after each code chunk.
+
+---
+
+## Question #2
+
+* Generate a buffered point-based (ie OPTION #4 from Mod 2.3.4) modelling frame
+* Set buffer of 10,000 m
+* Set CRS of modelling frame to epsg:42303
+
+---
+
+## Question #3
+
+* Select larger of the two frames as FISHNET extent 
+  * (HINT: examine extents of both -- one will be larger)
+
+---
+
+## Question #4
+
+* Build a 1,000 m (1 km) square FISHNET
+* Save both spatial and dataframe FISHNETs as R objects 
+  * (NOTE: we will use these later so be sure and save !!!)
+* Export as both dataframe (ie, no geometry) and ESRI shapefile
+
+---
+
+## Question #5
+
+Once you have completed the analyses above, answer the following:
+
+* How do the known SCWE presences relate to the modelling frame "blob"?
+* How different is the SCWE "blob" from a buffered point-based modelling domain?
+* What is the best "blob" for creating a data indexing FISHNET?  Why?
+
+---
+
+## The End
+
+---

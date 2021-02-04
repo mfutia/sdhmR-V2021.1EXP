@@ -1,0 +1,103 @@
+---
+title: "Exercise Title Goes Here"
+author: "Your Name Goes Here"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+<!-- These are global options  
+       set root directory here 
+       NOTE mine is active; yours is commented out
+       change the path to reflect your CPU,
+       then comment out or delete mine
+--> 
+```{r global_options, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+```
+
+---
+
+## This exercise links to Module 6
+
+Submit the completed exercise to us at:
+
+* t.edwards@usu.edu 
+* eric_tsakiris@fws.gov  
+
+---
+
+## Context
+
+The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
+
+The goal is to: 
+
+* Build ensemble map products of the $\bar{x}$ and $SD$ probabilities 
+* Build ensemble concordance map products of 3, 5, and union of all models 
+* Build tables of frequencies: 
+  * Presences (ie, sum the cells of classified presence for the 3, 5, and union ensembles) 
+  * Concordances (remember, this is a measure of "how much !!) 
+
+Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
+
+* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
+* **Mortality**: these data indicate spatial locations where mortality has been observed
+* **Persistence**: these data have no observed mortality or seedling at given spatial locations
+* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
+
+---
+
+## The Data
+
+* Load:
+  * The previously constructed SDHM models, for your group label, and 
+  * The (i) prediction; and (ii) classified maps
+
+If you did **NOT** save these you're in a bit of trouble ...
+
+---
+
+## Question #1
+
+* Build ensemble map products of:
+  * SDHM mean and sd probabilities
+  * SDHM concordance maps of 5, 3, and union of all SDHM overlaps
+  * "Clip" all these maps by the bounding boxes created earlier (see Module 2.3.3 for refresher, if needed)
+  * Output these map products as **`.img`** files
+
+```{r}
+# code for the question goes inside chunks, if part of the exercise solution.
+#  If not part of the exercise questions delete this.
+#  NOTE: do NOT answer all questions from within the same chunk
+```
+
+**YET ANOTHER NOTE RELATED TO CODE:**  
+If King's English interpretation is required, it will go here, after each code chunk.
+
+---
+
+## Question #2
+
+* Calculate the frequencies of "presence" in each of the 5 SDHMs
+
+---
+
+## Question #3
+
+* Tally the frequencies of concordance after "clipping" and compare with above
+
+---
+
+## Question #4
+
+* Save your data as R objects:
+  * All ensemble prediction maps as **`.img`** format
+* Save these R objects in a **`.RData`** file as well
+
+---
+
+## The End
+
+---

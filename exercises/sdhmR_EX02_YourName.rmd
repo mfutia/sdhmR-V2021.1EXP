@@ -1,0 +1,102 @@
+---
+title: "Exercise Title Goes Here"
+author: Eli Polzer, Mia McReynolds, Matt Futia
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+<!-- These are global options  
+       set root directory here 
+       NOTE mine is active; yours is commented out
+       change the path to reflect your CPU,
+       then comment out or delete mine
+--> 
+```{r global_options, include=FALSE}
+knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+```
+
+---
+
+## This exercise links to Module 2.3.3
+
+Submit the completed exercise to us at:
+
+* t.edwards@usu.edu 
+* eric_tsakiris@fws.gov 
+
+---
+
+## Context
+
+The exercise explores the consequences of frame selection on numerical summaries of predictive variables.  The species being explored is [*Pinus edulis* Common piñon](https://www.conifers.org/pi/Pinus_edulis.php).  Feel free to refer to the illustrations in Module 2.3.2 for graphical context.
+
+## The Data
+
+* Load **`spp106.soil.Rdata`** and **`spp106.clim.Rdata`** (or import **`spp106.soil.csv`**, **`spp106.clim.csv`**)
+* Data in: **`~\sdhmR-V2020.2\data\module02`**
+
+---
+
+## Question #1
+
+* What are the expected consequences in terms of a SDHM classification model if differences between environmental variables measured at presence:absence sites are large vs. small?
+
+```{r}
+# code for the question goes inside chunks, if part of the exercise solution.
+#  If not part of the exercise questions delete this.
+#  NOTE: do NOT answer all questions from within the same chunk
+```
+
+**YET ANOTHER NOTE RELATED TO CODE:**  
+If King's English interpretation is required, it will go here, after each code chunk.
+
+---
+
+## Question #2
+
+* How might these differing frames, and their respective variable differences based on the presence or absence of the species, affect: 
+  * (i) ecological interpretations, and 
+  * (ii) their classification ability, of variables?
+
+---
+
+## Question #3
+
+* How do you decide which frame -- given many competing -- is appropriate for SDHM construction?
+
+---
+
+## Question #4
+
+* Examine variable names and select 3 for all subsequent questions.  Identify them below in your answer to this question.
+
+---
+
+## Question #5
+
+* Run some simple descriptive statistics (ie, $\bar{x}$, $SD$) on the three (3) selected variables from above and compare across frames (where 1=inside frame; 0=outside): 
+* There are four (4) frames to evaluate:
+  * Western U.S. states; this frame is defined as the entire dataframe N
+  * **`$dry.domfr`** = all *edulis* within the dry domain
+  * **`$SPPRES106.fiafr`** = buffered *edulis* distribution based on FIA data points
+  * **`$SPPRES106.cmbfr`** = buffered *edulis* distribution based on FIA data points plus the UNION with [Little’s mapped tree distributions](https://www.fs.fed.us/database/feis/pdfs/Little/aa_SupportingFiles/LittleMaps.html).
+  
+---
+  
+## Question #6
+
+* Build box plots with the 4 frames by variable for each of your selected variable, ie this will be 3 variables $\times$ 4 different frames.
+
+---
+
+## Question #7: 
+
+* Identify which of the variables that subjectively (No statistical tests here, please!Just your Mark I eyeballs.) look as though they would discriminate between presence and absence
+
+---
+
+## The End
+
+---
