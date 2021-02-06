@@ -44,12 +44,19 @@ The exercise explores the consequences of frame selection on numerical summaries
   library(terra)	# FXNS: as.data.frame, rast, vect
   library(readr)
   library(ggplot2)
+  library(dplyr)
+  library(tidyr)
 
 #filepaths
   path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
   path.mod2 <- paste(path.root, "/data/module02", sep = "")
   path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
   path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+  
+#import data
+setwd(path.mod2)
+spp_soil <- read_csv("spp106.soil.csv") 
+spp_clim <- read_csv("spp106.clim.csv")
 ```
 ---
 
@@ -71,7 +78,7 @@ However, errors may occur in building SDHMs based on mathematical reasoning and 
 
 i) Ecological interpretations are affected because the frames have different spatial extents and data sources, which can limit research questions and comparisons between sites. Using a modelling frame with a larger spatial extent that covers a greater range of variables allow findings from the model to be extrapolated to a wider range of ecological conditions. Some of the frames were guided by previous research, which should be reflected in the model objectives and interpretation. For example, an SDHM could investigate current tree distribution within the extent of trees documented by Little. Since this SDHM is built from a distribution that these trees were shown to occupy, the range of variables is narrower and will under-represent conditions associated with absence of the species. 
 
-Having frames that are much larger than the actual range of a species may cause ecological interpretations to be biased towards environmental factors with large variance rather than factors that are most influential for the habitat use.  Alternatively, small frames may exclude observations resulting in a different interpretation of the species' habitat use.
+  Having frames that are much larger than the actual range of a species may cause ecological interpretations to be biased towards environmental factors with large variance rather than factors that are most influential for the habitat use.  Alternatively, small frames may exclude observations resulting in a different interpretation of the species' habitat use.
 
 ii) While small differences or changes may indicate that environmental variables are less important in discriminatory analysis, large differences of environmental variables when viewed across differing modeling frames likely indicate an important attribute with enhanced discriminatory power. Classification ability is affected because these frames vary in the range of environmental variables -- for example, the dry desert plus Little's framework has the smallest variation in elevation between presence/absence sites. 
 
@@ -150,8 +157,8 @@ FIA_Little_points <- spp_soil %>%
 FIA_Little_points
 ```
   
-  
-The summary values seem very similar over these four spatial extents, and the mean plus/minus standard deviations overlap for all three variables. 
+The summary values seem very similar over these four spatial extents. I'd suspect that they are not statistically distinguishable, as the mean plus/minus 1 standard deviation overlaps for all three variables. 
+
 ---
   
 ## Question #6
