@@ -1,0 +1,178 @@
+---
+title: "sdhmR Homework 2_M2.3"
+author: "Eli L. Polzer"
+date: "05 February 2021"
+output: html_document
+---
+
+<!-- 
+
+--> 
+```{r global_options, include=FALSE}
+knitr::opts_knit$set(root.dir = "C:/Users/epolzer/Documents/sdhmR-V2021.1/sdhmR-V2021.1EXP")
+knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+```
+
+---
+
+## This exercise links to Module 2.3.3
+
+Submit the completed exercise to us at:
+
+* t.edwards@usu.edu 
+* eric_tsakiris@fws.gov 
+
+---
+
+## Context
+
+The exercise explores the consequences of frame selection on numerical summaries of predictive variables.  The species being explored is [*Pinus edulis* Common piñon](https://www.conifers.org/pi/Pinus_edulis.php).  Feel free to refer to the illustrations in Module 2.3.2 for graphical context.
+
+## The Data
+
+* Load **`spp106.soil.Rdata`** and **`spp106.clim.Rdata`** (or import **`spp106.soil.csv`**, **`spp106.clim.csv`**)
+* Data in: **`~\sdhmR-V2020.2\data\module02`**
+
+---
+
+## Question #1
+
+* What are the expected consequences in terms of a SDHM classification model if differences between environmental variables measured at presence:absence sites are large vs. small?
+
+Whereas small differences between variables at presence/absence sites give one less room to discriminate, larger differences have more room to discriminate.
+
+---
+
+## Question #2
+
+* How might these differing frames, and their respective variable differences based on the presence or absence of the species, affect: 
+  * (i) ecological interpretations, and 
+  * (ii) their classification ability, of variables?
+
+While small differences or changes may indicate that environmental variables are less important in discriminatory analysis, large differences of environmental variables when viewed across differing modeling frames likely indicate an important attribute with enhanced discriminatory power.
+
+---
+
+## Question #3
+
+* How do you decide which frame -- given many competing -- is appropriate for SDHM construction?
+
+This question references back to user objectives/intended use. Like variable selection, selection of modeling frame should not be done arbitrarily, as one’s choice may unintentionally aid the production of models that inadequately represent habitats and species distributions and have less predictive power. While a model utilizing higher quality attribute data may be needed to guide decisions with significant consequences, a more simplistic model employing less ‘ideal’ data at a coarser spatial scale may be sufficient for another venture having less significant costs.
+
+---
+
+## Question #4
+
+* Examine variable names and select 3 for all subsequent questions. Identify them below in your answer to this question.
+
+From the soil dataset, I selected awc_ave (presumably average available water content) and cec (cation exchange capacity). From the clim dataset, I chose seasonal precipitation (prec_winte, prec_sprin, prec_summe, and prec_fall).
+
+---
+
+## Question #5
+
+* Run some simple descriptive statistics (ie, $\bar{x}$, $SD$) on the three (3) selected variables from above and compare across frames (where 1=inside frame; 0=outside). 
+
+```{r}
+spp.d2.soil <- read.csv("C:/Users/epolzer/Documents/sdhmR-V2021.1/sdhmR-V2021.1EXP/Data/module02/spp106.soil.csv", stringsAsFactors = F, 
+                        header = T)
+spp.d2.soil.dd <- subset(spp.d2.soil, dry.domfr == 1) 
+spp.d2.soil.fia <- subset(spp.d2.soil.dd, SPPRES106.fiafr == 1) 
+spp.d2.soil.cmb <- subset(spp.d2.soil.dd, SPPRES106.cmbfr == 1)
+dim(spp.d2.soil)
+dim(spp.d2.soil.dd) 
+dim(spp.d2.soil.fia)
+dim(spp.d2.soil.cmb)
+```
+ 
+```{r}
+##AWC_AVE and CEC
+aggregate(spp.d2.soil[, 9,13], list(presab = spp.d2.soil$SPPRES106), mean, na.rm = T)
+aggregate(spp.d2.soil.dd[, 9,13], list(presab = spp.d2.soil.dd$SPPRES106), mean, na.rm = T)
+aggregate(spp.d2.soil.fia[, 9,13], list(pres = spp.d2.soil.fia$SPPRES106), mean, na.rm = T)
+aggregate(spp.d2.soil.cmb[, 9,13], list(presab = spp.d2.soil.cmb$SPPRES106), mean, na.rm = T)
+``` 
+
+```{r}
+spp.d2.clim <- read.csv("C:/Users/epolzer/Documents/sdhmR-V2021.1/sdhmR-V2021.1EXP/Data/module02/spp106.clim.csv", stringsAsFactors = F, 
+                        header = T)
+spp.d2.clim.dd <- subset(spp.d2.clim, dry.domfr == 1)
+spp.d2.clim.fia <- subset(spp.d2.clim.dd, SPPRES106.fiafr == 1)
+spp.d2.clim.cmb <- subset(spp.d2.clim.dd, SPPRES106.cmbfr == 1)
+dim(spp.d2.clim)
+dim(spp.d2.clim.dd)
+dim(spp.d2.clim.fia)
+dim(spp.d2.clim.cmb)
+```
+
+```{r}
+##SEASONAL PRECIPITATION
+aggregate(spp.d2.clim[, 81:84], list(presab = spp.d2.clim$SPPRES106), mean, na.rm = T)
+aggregate(spp.d2.clim.dd[, 81:84], list(presab = spp.d2.clim.dd$SPPRES106), mean, na.rm = T)
+aggregate(spp.d2.clim.fia[, 81:84], list(pres = spp.d2.clim.fia$SPPRES106), mean, na.rm = T)
+aggregate(spp.d2.clim.cmb[, 81:84], list(presab = spp.d2.clim.cmb$SPPRES106), mean, na.rm = T)
+```
+---
+  
+## Question #6
+
+* Build box plots with the 4 frames by variable for each of your selected variable, ie this will be 3 variables $\times$ 4 different frames.
+
+```{r}
+##BOX PLOTS - AWC_AVE
+par(mfrow = c(1, 4))
+boxplot(spp.d2.soil[, 9] ~ spp.d2.soil$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Average AWC", main = "Frame=All")
+boxplot(spp.d2.soil.dd[, 9] ~ spp.d2.soil.dd$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Average AWC", main = "Frame=Dry Domain")
+boxplot(spp.d2.soil.fia[, 9] ~ spp.d2.soil.fia$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Average AWC", main = "Frame=FIA") 
+boxplot(spp.d2.soil.cmb[, 9] ~ spp.d2.soil.cmb$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Average AWC", main = "Frame=FIA+Little")
+par(mfrow = c(1, 1))
+```
+
+```{r}
+##BOX PLOTS - CEC
+par(mfrow = c(1, 4))
+boxplot(spp.d2.soil[, 13] ~ spp.d2.soil$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "CEC", main = "Frame=All")
+boxplot(spp.d2.soil.dd[, 13] ~ spp.d2.soil.dd$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "CEC", main = "Frame=Dry Domain")
+boxplot(spp.d2.soil.fia[, 13] ~ spp.d2.soil.fia$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "CEC", main = "Frame=FIA") 
+boxplot(spp.d2.soil.cmb[, 13] ~ spp.d2.soil.cmb$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "CEC", main = "Frame=FIA+Little")
+par(mfrow = c(1, 1))
+```
+
+```{r}
+##BOX PLOTS - ETPT_WINTE
+par(mfrow = c(1, 4))
+boxplot(spp.d2.clim[, 21] ~ spp.d2.clim$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Evapotranspiration (Winter)", main = "Frame=All")
+boxplot(spp.d2.clim.dd[, 21] ~ spp.d2.clim.dd$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Evapotranspiration (Winter)", main = "Frame=Dry Domain") 
+boxplot(spp.d2.clim.fia[, 21] ~ spp.d2.clim.fia$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Evapotranspiration (Winter)", main = "Frame=FIA") 
+boxplot(spp.d2.clim.cmb[, 21] ~ spp.d2.clim.cmb$SPPRES106, xlab = "Presence:Absence", 
+        ylab = "Evapotranspiration (Winter)", main = "Frame=FIA+Little") 
+par(mfrow = c(1, 1))
+```
+
+---
+
+## Question #7: 
+
+* Identify which of the variables that subjectively (No statistical tests here, please! Just your Mark I eyeballs.) look as though they would discriminate between presence and absence. Note any differences, and explain them in a couple of bullets.
+
+CEC, having a very tight distribution, demonstrated very little differences across the 4 modeling frames; thus, I would be disinclined to select it as a meaningful discriminatory variable. Within average AWC, also with a narrow distribution, ALL and DD frames are nearly identical. ETPT_WINTE (winter average) appears to be more variable overall (wider distribution) of the 3 examined variables.
+
+Of the three, I would select winter evapotranspiration as having greater discriminatory power than either CEC or AWC_AVE. I would also then perform similar analyses on the remaining seasonal ETPT variables in the dataset to evaluate which of them all likely had the greatest predictive capability.
+
+
+---
+
+## The End
+
+---
