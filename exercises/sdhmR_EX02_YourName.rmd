@@ -2,14 +2,14 @@
 title: "Exercise 2"
 author: "Eli Polzer, Mia McReynolds, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
-knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+
 ```
 
 ---
@@ -32,20 +32,20 @@ The exercise explores the consequences of frame selection on numerical summaries
 * Load **`spp106.soil.Rdata`** and **`spp106.clim.Rdata`** (or import **`spp106.soil.csv`**, **`spp106.clim.csv`**)
 * Data in: **`~\sdhmR-V2020.2\data\module02`**
 
+```{r}
+load("C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/module02/spp106.soil.Rdata")
+load("C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/module02/spp106.clim.Rdata")
+library(tidyverse)
+```
+
+
 ---
 
 ## Question #1
 
 * What are the expected consequences in terms of a SDHM classification model if differences between environmental variables measured at presence:absence sites are large vs. small?
 
-```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
-```
-
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+MHF: *Environmental variables with large differences would require a low resolution that may not distinguish factors with small variance. As a result, these factors with smaller variance, which may have high biological importance, would have less influence for modeling a species distribution.*
 
 ---
 
@@ -55,17 +55,31 @@ If King's English interpretation is required, it will go here, after each code c
   * (i) ecological interpretations, and 
   * (ii) their classification ability, of variables?
 
+MHF: *i: Having frames that are much larger than the actual range of a species may cause ecological interpretations to be biased towards environmental factors with large variance rather than factors that are most influential for the habitat use. Alternatively, small frames may exclude observations resulting in a different interpretation of the species' habitat use.*
+*ii: Having biases favoring environmental factors with greater variance may reduce classification ability by minimizing the influence of factors that are most relevant for describing a species' habitat.*
+
 ---
 
 ## Question #3
 
 * How do you decide which frame -- given many competing -- is appropriate for SDHM construction?
 
+MHF: *Based on the frame that incorporates the greatest number of environmental variables associated with a species of interest, while also trying to incorporate the maximum geographic space used by the species.*
+
 ---
 
 ## Question #4
 
 * Examine variable names and select 3 for all subsequent questions.  Identify them below in your answer to this question.
+
+```{r}
+colnames(spp106.clim)
+colnames(spp106.soil)
+```
+
+* *awc_wtavg*
+* *clay*
+* *frag3to10*
 
 ---
 
@@ -78,17 +92,68 @@ If King's English interpretation is required, it will go here, after each code c
   * **`$SPPRES106.fiafr`** = buffered *edulis* distribution based on FIA data points
   * **`$SPPRES106.cmbfr`** = buffered *edulis* distribution based on FIA data points plus the UNION with [Little’s mapped tree distributions](https://www.fs.fed.us/database/feis/pdfs/Little/aa_SupportingFiles/LittleMaps.html).
   
+### *Western US frame:*
+```{r}
+all = spp106.soil[,c("awc_wtave", "clay", "frag3to10")]
+apply(all,2,function(all){mean(all, na.rm = T)})
+apply(all,2,function(all){sd(all, na.rm = T)})
+```
+* *awc_wtave: 2843.6 $\pm$ 2412.3*
+* *clay: 21.2 $\pm$ 9.4*
+* *frag3to10: 6.5 $\pm$ 8.1*
+
+### *`$dry.domfr` frame:*
+```{r}
+dry = filter(spp106.soil[,c("dry.domfr","awc_wtave", "clay", "frag3to10")], dry.domfr == 1)
+apply(dry,2,function(dry){mean(dry, na.rm = T)})
+apply(dry,2,function(dry){sd(dry, na.rm = T)})
+```
+* *awc_wtave: 2915.0 $\pm$ 2443.0*
+* *clay: 21.2 $\pm$ 9.4*
+* *frag3to10: 6.6 $\pm$ 8.2*
+
+### *`$SPPRES106.fiafr` frame:*
+```{r}
+fiafr = filter(spp106.soil[,c("SPPRES106.fiafr","awc_wtave", "clay", "frag3to10")], SPPRES106.fiafr == 1)
+apply(fiafr,2,function(fiafr){mean(fiafr, na.rm = T)})
+apply(fiafr,2,function(fiafr){sd(fiafr, na.rm = T)})
+```
+* *awc_wtave: 3356.0 $\pm$ 2564.7*
+* *clay: 21.0 $\pm$ 7.2*
+* *frag3to10: 8.7 $\pm$ 9.8*
+
+### *`$SPPRES106.cmbfr` frame:*
+```{r}
+cmbfr = filter(spp106.soil[,c("SPPRES106.cmbfr","awc_wtave", "clay", "frag3to10")], SPPRES106.cmbfr == 1)
+apply(cmbfr,2,function(cmbfr){mean(cmbfr, na.rm = T)})
+apply(cmbfr,2,function(cmbfr){sd(cmbfr, na.rm = T)})
+```
+* *awc_wtave: 3353.5 $\pm$ 2572.6*
+* *clay: 20.8 $\pm$ 7.2*
+* *frag3to10: 8.5 $\pm$ 9.7*
+
 ---
   
 ## Question #6
 
 * Build box plots with the 4 frames by variable for each of your selected variable, ie this will be 3 variables $\times$ 4 different frames.
 
+```{r}
+par(mfrow = c(2,2))
+boxplot(all)
+boxplot(dry[2:4])
+boxplot(fiafr[2:4])
+boxplot(cmbfr[2:4])
+```
+
+
 ---
 
 ## Question #7: 
 
 * Identify which of the variables that subjectively (No statistical tests here, please!Just your Mark I eyeballs.) look as though they would discriminate between presence and absence
+
+MHF: *The awc_wtave looks like it would have the most influence between presence and absence because it has the greatest variance for all frames*
 
 ---
 
