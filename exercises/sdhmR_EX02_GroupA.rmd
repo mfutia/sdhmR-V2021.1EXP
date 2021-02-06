@@ -100,18 +100,89 @@ It's really hard to interpret the names in spp clim, so I'll use some of the spp
   * **`$dry.domfr`** = all *edulis* within the dry domain
   * **`$SPPRES106.fiafr`** = buffered *edulis* distribution based on FIA data points
   * **`$SPPRES106.cmbfr`** = buffered *edulis* distribution based on FIA data points plus the UNION with [Little’s mapped tree distributions](https://www.fs.fed.us/database/feis/pdfs/Little/aa_SupportingFiles/LittleMaps.html).
+
+```{r}
+western_US_states <- spp_soil %>% 
+  summarise(mean_awc_wtave = mean(awc_wtave, na.rm=TRUE), 
+            sd_awc_wtave = sd(awc_wtave, na.rm=TRUE),
+          mean_clay = mean(clay, na.rm=TRUE),
+          sd_clay = sd(clay, na.rm=TRUE),
+          mean_frag3to10 = mean(frag3to10, na.rm=TRUE),
+          sd_frag3to10 = sd(frag3to10, na.rm=TRUE))
+western_US_states
+```
+```{r}
+dry_domain <- spp_soil %>%
+  filter(dry.domfr==1) %>% 
+  summarise(mean_awc_wtave = mean(awc_wtave, na.rm=TRUE), 
+            sd_awc_wtave = sd(awc_wtave, na.rm=TRUE),
+          mean_clay = mean(clay, na.rm=TRUE),
+          sd_clay = sd(clay, na.rm=TRUE),
+          mean_frag3to10 = mean(frag3to10, na.rm=TRUE),
+          sd_frag3to10 = sd(frag3to10, na.rm=TRUE))
+dry_domain
+```
+
+```{r}
+FIA_points <- spp_soil %>% 
+  filter(SPPRES106.fiafr==1) %>% 
+  summarise(mean_awc_wtave = mean(awc_wtave, na.rm=TRUE), 
+            sd_awc_wtave = sd(awc_wtave, na.rm=TRUE),
+          mean_clay = mean(clay, na.rm=TRUE),
+          sd_clay = sd(clay, na.rm=TRUE),
+          mean_frag3to10 = mean(frag3to10, na.rm=TRUE),
+          sd_frag3to10 = sd(frag3to10, na.rm=TRUE))
+FIA_points
+```
+
+```{r}
+FIA_Little_points <- spp_soil %>% 
+  filter(SPPRES106.cmbfr==1) %>% 
+  summarise(mean_awc_wtave = mean(awc_wtave, na.rm=TRUE), 
+            sd_awc_wtave = sd(awc_wtave, na.rm=TRUE),
+          mean_clay = mean(clay, na.rm=TRUE),
+          sd_clay = sd(clay, na.rm=TRUE),
+          mean_frag3to10 = mean(frag3to10, na.rm=TRUE),
+          sd_frag3to10 = sd(frag3to10, na.rm=TRUE))
+FIA_Little_points
+```
   
+  
+The summary values seem very similar over these four spatial extents, and the mean plus/minus standard deviations overlap for all three variables. 
 ---
   
 ## Question #6
 
 * Build box plots with the 4 frames by variable for each of your selected variable, ie this will be 3 variables $\times$ 4 different frames.
 
+```{r}
+#reshape data for easier plotting
+spp_soil_long <-  pivot_longer(spp_soil, cols=SPPRES106:SPPRES106.cmbfr, names_to="SpatialExtent", values_to="PartofSF") %>% 
+  filter(PartofSF==1)
+
+
+ggplot(spp_soil_long, aes(x=SpatialExtent, y=awc_wtave)) +
+  geom_boxplot() +
+  theme_classic()
+
+ggplot(spp_soil_long, aes(x=SpatialExtent, y=clay)) +
+  geom_boxplot() +
+  theme_classic()
+
+ggplot(spp_soil_long, aes(x=SpatialExtent, y=frag3to10)) +
+  geom_boxplot() +
+  theme_classic()
+```
+
+The distribution of values is very similar for the 4 spatial frames considered. On average, the dry domain is somewhat lower in average water content and mean fragment 3 to 10. However, the overall range and distributions are very similar. 
+
 ---
 
 ## Question #7: 
 
 * Identify which of the variables that subjectively (No statistical tests here, please!Just your Mark I eyeballs.) look as though they would discriminate between presence and absence
+
+Based on the plots above, these three variables would likely not discriminate well between presence and absence, because their values are similar among different spatial extents (or, different concentrations of presence/absence points). The most likely candidates are average water content and mean fragment 3 to 10, since they show slight differences between the dry domain and the smaller region of FIA/Little's points where the trees are present. 
 
 ---
 
