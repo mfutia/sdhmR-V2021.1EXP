@@ -9,7 +9,6 @@ output: html_document
 ```{r global_options, include=FALSE}
 # knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
 
-#Mia's directory
 knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
 
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
@@ -62,11 +61,6 @@ Statistically, it's easier to build a reliable classification model based on env
 
 However, errors may occur in building SDHMs based on mathematical reasoning and ignoring the biology of the species of interest. If species are finely attuned to environmental factors with smaller variance between presence:absence sites, these factors may be treated as unimportance in the model building process despite their high biological importance. 
 
-<!-- MHF: *Environmental variables with large differences would require a low resolution that may not distinguish factors with small variance. As a result, these factors with smaller variance, which may have high biological importance, would have less influence for modeling a species distribution.* -->
-
-<!-- EP: Whereas small differences between variables at presence/absence sites give one less room to discriminate, larger differences have more room to discriminate. -->
-
-
 ---
 
 ## Question #2
@@ -81,11 +75,6 @@ Having frames that are much larger than the actual range of a species may cause 
 
 ii) While small differences or changes may indicate that environmental variables are less important in discriminatory analysis, large differences of environmental variables when viewed across differing modeling frames likely indicate an important attribute with enhanced discriminatory power. Classification ability is affected because these frames vary in the range of environmental variables -- for example, the dry desert plus Little's framework has the smallest variation in elevation between presence/absence sites. 
 
-<!-- MHF: *i: Having frames that are much larger than the actual range of a species may cause ecological interpretations to be biased towards environmental factors with large variance rather than factors that are most influential for the habitat use. Alternatively, small frames may exclude observations resulting in a different interpretation of the species' habitat use.* -->
-*ii: Having biases favoring environmental factors with greater variance may reduce classification ability by minimizing the influence of factors that are most relevant for describing a species' habitat.*
-
-<!-- EP: While small differences or changes may indicate that environmental variables are less important in discriminatory analysis, large differences of environmental variables when viewed across differing modeling frames likely indicate an important attribute with enhanced discriminatory power. -->
-
 ---
 
 ## Question #3
@@ -96,12 +85,6 @@ This question references back to user objectives/intended use. Like variable sel
 
 You should consider the extent and density of available data sources, as well as the spatial extent to which you want to apply the model. 
 
-<!-- EP: This question references back to user objectives/intended use. Like variable selection, selection of modeling frame should not be done arbitrarily, as one’s choice may unintentionally aid the production of models that inadequately represent habitats and species distributions and have less predictive power. While a model utilizing higher quality attribute data may be needed to guide decisions with significant consequences, a more simplistic model employing less ‘ideal’ data at a coarser spatial scale may be sufficient for another venture having less significant costs. -->
-
-<!-- MHF: *Based on the frame that incorporates the greatest number of environmental variables associated with a species of interest, while also trying to incorporate the maximum geographic space used by the species.* -->
-<!-- Not sure I agree with this-- should be matched up with intended use statement, I think? -MM -->
-
-
 ---
 
 ## Question #4
@@ -110,7 +93,6 @@ You should consider the extent and density of available data sources, as well as
 
 It's really hard to interpret the names in spp clim, so I'll use some of the spp soil variables. avc_wtavg may be average water content, weighted average. Clay is the clay % in soil. Frag3 to 10 is a measurement of grain size that shows rock fragments through a No. 10 sieve. 
 
-<!-- Matt and I chose the same ones, and I think we all did this successfully and got similar results... will leave my code here -->
 ---
 
 ## Question #5
