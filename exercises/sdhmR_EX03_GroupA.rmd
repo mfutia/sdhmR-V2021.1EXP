@@ -1,21 +1,37 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Homework 3: Modelling Frame and FISHNET Construction"
+author: "Eli Polzer, Matt Futia, and Amelia McReynolds"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+#Mia's directory
+knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
+
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+
+#filepaths
+  path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
+  path.mod2 <- paste(path.root, "/data/module02", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
 ```
+
+```{r}
+# some libraries
+  library(raster)	# FXNS: extent, raster, res, rasterize, values, writeRaster, 
+					#       cellFromXY, extract
+  library(sf)    	# FXNS: st_as_sf, st_as_sfc, st_bbox, st_convex_hull, st_union
+					#       st_buffer, st_read, st_write, st_intersection, st_geometry,
+					#       st_drop_geometry, st_coordinates, st_sf
+  library(terra)	# FXNS: as.data.frame, rast, vect
+  library(readr)
+  library(ggplot2)
+  library(dplyr)
+  library(tidyr)
+```
+
 
 ---
 
@@ -52,13 +68,50 @@ The Uinta Basin hookless cactus (*Sclerocactus wetlandicus*) (SCWE) is listed as
 * Plot the presence points relative to the ECOS-based polygon "blob"
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+#import ECOS blob shapefile w/ sf package
+scwe_ecospoly <- st_read("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/gis_layers/scwe_ecospoly.shp")
+
+#import presence points data w/ readr
+scwe_pres <- read_csv("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/scwe_pres.csv", 
+     col_types = cols(date.r = col_date(format = "%Y-%m-%d")))
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+#proj4string for epsg:42303 from https://epsg.io/42303 
+prj.epsg42303 <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs no_defs"
+
+#proj4string for the scwe_pres current CRS:  ALBERS NORTH AMERICA NAD83
+#   https://epsg.io/5070
+    prj.aeaN83 <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs" # epsg:42303 
+
+
+#set CRS of the ECOS "blob" to epsg:42303 -- convert from the current crs
+  scwe_ecospoly_01 <- st_transform(scwe_ecospoly, crs = prj.epsg42303) # output pts as spatial
+  st_crs(scwe_ecospoly_01)$proj4string # check crs 
+
+#set CRS of the imported points to epsg:42303 - similar to CSV in m02.01-dataimport
+pts.in <- st_as_sf(scwe_pres, coords = c("aeaN83_x", "aeaN83_x"), 
+    crs = prj.aeaN83, remove = F) # remove=F to retain input x,y
+  st_crs(pts.in)$proj4string # check crs
+
+  # transform to new crs -- convert from the current crs
+  scwe_pres_01 <- st_transform(pts.in, crs = prj.epsg42303) # output pts as spatial
+  st_crs(scwe_pres_01)$proj4string # check crs -looks good
+
+  # adding new geometry back into dataframe as columns
+  coords <- data.frame(st_coordinates(scwe_pres_01)) # create df of new geometry
+  names(coords) <- c("NAD83_x", "NAD83_y") # assign names
+  scwe_pres_01 <- st_sf(data.frame(scwe_pres_01,coords)) # add columns
+
+```
+
+```{r}
+# Plot the presence points relative to the ECOS-based polygon "blob"
+par(mfrow = c(1, 1))
+  plot(st_geometry(scwe_ecospoly_01), axes = T, col = "grey70") # simple plot
+# add presence points
+  points(scwe_pres_01$NAD83_x, scwe_pres_01$NAD83_y, pch=20, col="darkgreen", add=T)
+```
 
 ---
 
