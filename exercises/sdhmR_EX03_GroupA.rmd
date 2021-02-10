@@ -89,8 +89,9 @@ prj.epsg42303 <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 
   scwe_ecospoly_01 <- st_transform(scwe_ecospoly, crs = prj.epsg42303) # output pts as spatial
   st_crs(scwe_ecospoly_01)$proj4string # check crs 
 
+  
 #set CRS of the imported points to epsg:42303 - similar to CSV in m02.01-dataimport
-pts.in <- st_as_sf(scwe_pres, coords = c("aeaN83_x", "aeaN83_x"), 
+pts.in <- st_as_sf(scwe_pres, coords = c("aeaN83_x", "aeaN83_y"), 
     crs = prj.aeaN83, remove = F) # remove=F to retain input x,y
   st_crs(pts.in)$proj4string # check crs
 
@@ -107,10 +108,9 @@ pts.in <- st_as_sf(scwe_pres, coords = c("aeaN83_x", "aeaN83_x"),
 
 ```{r}
 # Plot the presence points relative to the ECOS-based polygon "blob"
-par(mfrow = c(1, 1))
-  plot(st_geometry(scwe_ecospoly_01), axes = T, col = "grey70") # simple plot
-# add presence points
-  points(scwe_pres_01$NAD83_x, scwe_pres_01$NAD83_y, pch=20, col="darkgreen", add=T)
+ggplot() +
+  geom_sf(data=scwe_ecospoly_01, fill="gray70") +
+  geom_point(data=scwe_pres_01, aes(x=aeaN83_x, y=aeaN83_y), color="darkgreen") 
 ```
 
 ---
@@ -121,12 +121,40 @@ par(mfrow = c(1, 1))
 * Set buffer of 10,000 m
 * Set CRS of modelling frame to epsg:42303
 
+```{r}
+# obtain desired crs for modelling frame & res from existing GIS data layer in NAD83 (epsg42303)
+  t1 <- raster("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/gis_layers/elev_1k_aea.img")
+crs(t1)
+```
+
+```{r}
+#make a buffered sf 
+scwe.bufptSF <- st_buffer(scwe_pres_01, dist = 10000) # 10,000 m buffer (units are meters)
+  scwe.bufptSF <- st_union(scwe.bufptSF)  # merges all intersecting polys - usual for SDHM
+  scwe.bufptSF # examine
+  
+# extract buffered points from template & rasterize
+  scwe.bufptSP <- as_Spatial(scwe.bufptSF) # convert to sp spatialpolygon class
+  scwe.bufptR <- crop(rasterize(scwe.bufptSP, t1), scwe.bufptSP) # t1 is template from above
+  scwe.bufptR # examine
+```
+
 ---
 
 ## Question #3
 
 * Select larger of the two frames as FISHNET extent 
   * (HINT: examine extents of both -- one will be larger)
+  
+```{r}
+  ggplot() +
+  geom_sf(data=scwe_ecospoly_01,  fill="gray70") +
+    geom_sf(data=scwe.bufptSF, color="black", lwd=1.5, fill=NA)+
+  geom_point(data=scwe_pres_01, aes(x=NAD83_x, y=NAD83_y), color="darkgreen") +
+  theme_classic()
+    
+```
+  The frame created with 10 km-buffered points is larger than the ECOS polygon, so I will use the buffered points shapefile as the FISHNET extent. 
 
 ---
 
@@ -137,6 +165,48 @@ par(mfrow = c(1, 1))
   * (NOTE: we will use these later so be sure and save !!!)
 * Export as both dataframe (ie, no geometry) and ESRI shapefile
 
+
+```{r}
+
+# extract coords, cell id of coords, & build dataframe
+  f1 <- sp::coordinates(scwe.bufptR) # get spatial coords from scwe.bufptR
+  f2 <- cellFromXY(scwe.bufptR, f1) # extract cell number from buffered extent
+  f3 <- as.data.frame(cbind(f1, f2)) # build datframe of x,y & cell number
+  head(f3, 2) # examine
+  tail(f3, 1) # f2 value should eq. ncell in scwe.bufptR; below
+  ncell(scwe.bufptR) # should eq. f2 value above
+# some dataframe clean-up
+  names(f3)[1:3] <- c("cell.wgs_x", "cell.wgs_y", "FNETID") # assign names
+  f3 <- f3[c("FNETID", "cell.wgs_x", "cell.wgs_y")] # reorder
+
+# examine fishnet data structure
+  dim(f3) # dimension; rows is maximum number of cells in fishnet 
+  names(f3) # names in fishnet
+  head(f3, 2) # note first FNETID number
+  tail(f3, 2) # note last FNETID number matches dimension size
+
+# convert dataframe to spatial object
+  scwe.fnetSF <- st_as_sf(f3, coords = c("cell.wgs_x", "cell.wgs_y"), 
+    crs = prj.epsg42303, remove = F) # remove=F retains input x,y)
+  head(scwe.fnetSF, 2) # examine
+
+# build stand-alone dataframe from geospatial object
+  class(scwe.fnetSF) # note dataframe class; will extract data.frame
+  scwe.fnetDF <- st_drop_geometry(scwe.fnetSF) # build dataframe
+  head(scwe.fnetDF, 2) # examine
+  class(scwe.fnetDF) # check if class=data.frame
+
+# export as esri shapefile & dataframe
+  setwd(path.mod2) # output path
+  st_write(scwe.fnetSF, dsn = ".", layer = "scwe_fnetSF", driver = "ESRI Shapefile",
+    delete_layer = T, delete_dsn = T) # output shapefile
+
+# save objects
+  setwd(path.mod2) # output path
+  save("scwe.fnetSF", "scwe.fnetDF", file = "scwe.fnet.RData")
+```
+
+
 ---
 
 ## Question #5
@@ -146,6 +216,13 @@ Once you have completed the analyses above, answer the following:
 * How do the known SCWE presences relate to the modelling frame "blob"?
 * How different is the SCWE "blob" from a buffered point-based modelling domain?
 * What is the best "blob" for creating a data indexing FISHNET?  Why?
+
+
+The known presences were used to create our modelling frame blob. We used a 10 km buffer around the points to make a FISHNET. 
+
+The ECOS polygon was similar to the buffered point-based modelling domain that we used, but was smaller and the boundaries were more irregular. Maybe it was traced by hand in ArcGIS?
+
+The best blob matches the objectives set out in your Intended Use Statement, and uses resolution that matches the resolution of your data somewhat closely. Sweeping points into a FISHNET obscures their specific location and reports them as a value assigned to a cell's centroid, so it's important to avoid losing too much resolution from your data. 
 
 ---
 
