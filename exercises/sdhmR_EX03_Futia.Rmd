@@ -1,0 +1,204 @@
+---
+title: "Exercise Title Goes Here"
+author: "Your Name Goes Here"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+<!-- These are global options  
+       set root directory here 
+       NOTE mine is active; yours is commented out
+       change the path to reflect your CPU,
+       then comment out or delete mine
+--> 
+```{r global_options, include=FALSE}
+#knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = getwd())
+knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+
+#filepaths
+  path.root = getwd() 
+  path.mod2 = paste(path.root, "/data/module02", sep = "")
+  path.figs = paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis = paste(path.root, "/data/gis_layers", sep = "")
+```
+
+---
+
+## This exercise links to Module 2.3.4
+
+Submit the completed exercise to us at:
+
+* t.edwards@usu.edu 
+* eric_tsakiris@fws.gov 
+
+---
+
+## Context
+
+The Uinta Basin hookless cactus (*Sclerocactus wetlandicus*) (SCWE) is listed as a threatened species.  Recovery goals require:
+* An accurate range map;
+* Comprehensive surveys on locations; and
+* Other needs as well
+[FWS ECOS](https://ecos.fws.gov/ecp/species/9037) has an expert opinion-based "blob" of an hypothetical SCWE modelling (ie, the "blob") domain.
+
+## The Data
+
+* Acquire from the ECOS site the SCWE "blob" shapefile (call it: scwe_ecospoly) 
+* Import the **`scwe_pres.csv`** file of known SCWE presence points
+* Data in: **`~\sdhmR-V2020.2\data\gis_layers`** and **`...\module02`**, respectively
+```{r}
+```
+
+---
+
+## Question #1
+
+* Import the ECOS--acquired SCWE "blob" as a spatial object (call it: **`scwe_ecospoly`**)
+* Find and acquire the **`CRS epsg:42303`** and it's **`proj4string`** – this is the CRS for ALL subsequent analyses
+* Set CRS of (i) the ECOS "blob" and (ii) the imported points to epsg:42303
+* Plot the presence points relative to the ECOS-based polygon "blob"
+
+```{r}
+library(raster)
+library(sf)
+library(foreign)
+library(magrittr)
+library(ggplot2)
+
+scwe_ecospoly = st_read("data/gis_layers/scwe_ecospoly.shp") # SCWE shp (polygon)
+scwe_p = read.csv("data/module02/scwe_pres.csv")             # SCWE presence points 
+scwe_p$date.r %<>% as.Date(., format = "%Y-%m-%d")
+
+prj_epsg42303 = "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs no_defs"
+
+prj_aeaN83 = "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs" # epsg:42303 
+```
+
+```{r}
+# transform ECOS blob
+scwe_ecospoly.1 <- st_transform(scwe_ecospoly, crs = prj_epsg42303)
+st_crs(scwe_ecospoly.1)$proj4string
+
+# transform imported points
+scwe_points = st_as_sf(scwe_p, coords = c("aeaN83_x","aeaN83_y"), crs = prj_aeaN83, remove = F) # convert to point shapefile
+scwe_points = st_transform(scwe_points, crs = prj_epsg42303)
+st_crs(scwe_points)$proj4string
+
+#extract points with new CRS and add to original dataframe
+coords = data.frame(st_coordinates(scwe_points))
+names(coords) = c("NAD83_x", "NAD83_y")
+scwe_points = st_sf(data.frame(scwe_points, coords))
+
+```
+
+```{r}
+ggplot(scwe_ecospoly.1)+
+  geom_sf(color = "gray95")+
+  geom_point(data = scwe_points, aes(aeaN83_x.1, aeaN83_y.1), shape = 1, color = "green", inherit.aes = F)+
+  theme_classic()
+
+```
+
+---
+
+## Question #2
+
+* Generate a buffered point-based (ie OPTION #4 from Mod 2.3.4) modelling frame
+* Set buffer of 10,000 m (10 km = .1 degrees)
+* Set CRS of modelling frame to epsg:42303
+
+```{r}
+t1 <- raster("data/gis_layers/elev_1k_aea.img") # get base raster for conversion of polygon (sf)
+# ??? How did you pick this one; do you look at all until find one with epsg:42303???
+
+scwe_buf.points = st_buffer(scwe_points, dist = 10000) # create buffer of set distance
+# ??? How do you know units of dist???
+
+scwe_buf.points <- st_union(scwe_buf.points)  # merges all intersecting polys
+scwe_buf.points # examine
+
+scwe_buf_sp = as_Spatial(scwe_buf.points) #convert SF polygon to sp
+scwe.buf_R = crop(rasterize(scwe_buf_sp, t1), scwe_buf_sp) # convert to raster and crop raster layer to extent of original geospatial frame
+
+crs(scwe.buf_R)
+```
+
+---
+
+## Question #3
+
+* Select larger of the two frames as FISHNET extent 
+  * (HINT: examine extents of both -- one will be larger)
+  
+```{r}
+scwe_buf.points #bbox: -1205096, -1109030, 1933252, 2005708 (xmin, xmax, ymin, ymax)
+scwe_ecospoly.1 #bbox: -1206694, -1112295, 1931294, 2003811
+
+-1205096 - (-1109030) #96066
+-1206694 - (-1112295) #94399
+
+2005708 - 1933252 #72456
+2003811 - 1931294 #72517
+
+ggplot()+
+  geom_sf(data = scwe_buf.points, color = "black", fill = NA) +
+  geom_sf(data = scwe_ecospoly.1, color = "red", fill = NA)+
+  geom_point(data = scwe_points, aes(aeaN83_x.1, aeaN83_y.1), shape = 1, color = "green")+
+  theme_classic()
+
+```
+
+The frame made from the buffered points is larger (larger extent)
+
+---
+
+## Question #4
+
+* Build a 1,000 m (1 km) square FISHNET
+* Save both spatial and dataframe FISHNETs as R objects 
+  * (NOTE: we will use these later so be sure and save !!!)
+* Export as both dataframe (ie, no geometry) and ESRI shapefile
+
+```{r}
+f1 = sp::coordinates(scwe.buf_R) # get spatial coords from pied.bufR
+f2 = cellFromXY(scwe.buf_R, f1) # extract cell number from buffered extent (create fishnet id)
+f3 = as.data.frame(cbind(f1, f2))
+
+names(f3) = c("cell.wgs_x", "cell.wgs_y", "FNETID")
+  
+scwe.fnetSF = st_as_sf(f3, coords = c("cell.wgs_x", "cell.wgs_y"), crs = prj_epsg42303, remove = F) # build spatial frame
+scwe.fnetDF = st_drop_geometry(scwe.fnetSF) # build dataframe
+```
+
+```{r}
+# save objects
+save("scwe.fnetSF", "scwe.fnetDF", file = "swce.fnet.RData") # save spatial and df fishnets
+
+st_write(scwe.fnetSF, dsn = ".", layer = "scwe_fnetSF", driver = "ESRI Shapefile", delete_layer = T, delete_dsn = T) # output shapefile
+```
+
+---
+
+## Question #5
+
+Once you have completed the analyses above, answer the following:
+
+* How do the known SCWE presences relate to the modelling frame "blob"?
+* How different is the SCWE "blob" from a buffered point-based modelling domain?
+* What is the best "blob" for creating a data indexing FISHNET?  Why?
+
+*Known presences all fall within the blob*
+
+```{r}
+((st_area(scwe_buf.points) - st_area(scwe_ecospoly.1))/st_area(scwe_ecospoly.1))*100
+```
+
+*The differences in area between the two frames is about 10%*
+
+*The buffered point-based frame would be better because it has a larger extent and therefore may incorporate more environmental variables*
+---
+
+## The End
+
+---
