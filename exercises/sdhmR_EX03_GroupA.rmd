@@ -110,7 +110,8 @@ pts.in <- st_as_sf(scwe_pres, coords = c("aeaN83_x", "aeaN83_y"),
 # Plot the presence points relative to the ECOS-based polygon "blob"
 ggplot() +
   geom_sf(data=scwe_ecospoly_01, fill="gray70") +
-  geom_point(data=scwe_pres_01, aes(x=aeaN83_x, y=aeaN83_y), color="darkgreen") 
+  geom_point(data=scwe_pres_01, aes(x=NAD83_x, y=NAD83_y), color="darkgreen") +
+  theme_classic()
 ```
 
 ---
@@ -154,7 +155,19 @@ scwe.bufptSF <- st_buffer(scwe_pres_01, dist = 10000) # 10,000 m buffer (units a
   theme_classic()
     
 ```
-  The frame created with 10 km-buffered points is larger than the ECOS polygon, so I will use the buffered points shapefile as the FISHNET extent. 
+  
+```{r}
+scwe.bufptSF
+```
+```{r}
+scwe_ecospoly
+```
+  
+```{r}
+((st_area(scwe.bufptSF) - st_area(scwe_ecospoly))/st_area(scwe_ecospoly))*100
+```
+  
+   The frame created with 10 km-buffered points is 10.8% larger than the ECOS polygon, so I will use the buffered points shapefile as the FISHNET extent. 
 
 ---
 
@@ -218,11 +231,11 @@ Once you have completed the analyses above, answer the following:
 * What is the best "blob" for creating a data indexing FISHNET?  Why?
 
 
-The known presences were used to create our modelling frame blob. We used a 10 km buffer around the points to make a FISHNET. 
+The known presences were used to create our modelling frame blob, so all known SCWE presences fell within the blob. We used a 10 km buffer around the points to make a FISHNET. 
 
-The ECOS polygon was similar to the buffered point-based modelling domain that we used, but was smaller and the boundaries were more irregular. Maybe it was traced by hand in ArcGIS?
+The ECOS polygon was similar to the buffered point-based modelling domain that we used, but was slightly (~10%) smaller and the boundaries were more irregular. Maybe it was traced by hand in ArcGIS?
 
-The best blob matches the objectives set out in your Intended Use Statement, and uses resolution that matches the resolution of your data somewhat closely. Sweeping points into a FISHNET obscures their specific location and reports them as a value assigned to a cell's centroid, so it's important to avoid losing too much resolution from your data. 
+Choosing the larger extent for a FISHNET is the best choice because it's simpler to make a FISHNET smaller than make it larger, and greater environmental variability can be captured in the FISHNET. The best blob matches the objectives set out in your Intended Use Statement, and uses resolution that matches the resolution of your data somewhat closely. Sweeping points into a FISHNET obscures their specific location and reports them as a value assigned to a cell's centroid, so it's important to avoid losing too much resolution from your data. 
 
 ---
 
