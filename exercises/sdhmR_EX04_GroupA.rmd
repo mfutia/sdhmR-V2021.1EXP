@@ -29,13 +29,6 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
   library(terra)	# FXNS: as.data.frame, rast, vect
   library(readr)
   library(ggplot2)
-  library(rgdal) #writeOGR
-
-#filepaths
-  path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
-  path.mod2 <- paste(path.root, "/data/module02", sep = "")
-  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
-  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
 ```
 
 ---
@@ -115,6 +108,7 @@ prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
 
 ```{r}
  # obtain desired resolution from existing GIS data layer in WGS84
+setwd(path.gis)
 t1 <- terra::rast("templateR_wgs.img")
 	t1 #CRS is WGS 84
 
@@ -122,6 +116,8 @@ t1 <- terra::rast("templateR_wgs.img")
   rang.bufSP <- as_Spatial(rang.bufSF) # convert to sp spatialpolygon class
   rang.bufptR <- crop(rasterize(rang.bufSP, t1), rang.bufSP) # t1 is template from above
   rang.bufptR # examine
+
+   #how do you plot a raster in ggplot?
 ```
 There may be an error in the raster of the WGS84 reference, but it looks like the CRS is WGS84. How do we know what resolution & projection to use?
 
@@ -345,10 +341,10 @@ psu.srs2$in.modFR <- 1  # assign 1 to in.modFR
   
   save(rang.PPsA, file = "rang.PPsA.RData") # save .RData
   
-  # writeOGR(rang.bufSP, dsn=".", layer="rang.bufSP", driver="ESRI Shapefile")
+  st_write(rang.bufSP, dsn = ".", layer = "rang.bufSP", driver = "ESRI Shapefile",
+    delete_layer = T, delete_dsn = T) # output shapefile - writeOGR is outdated
 ```
 
-I can't get this to save as shapefile... Others were saved as I went, above. 
 
 ---
 
