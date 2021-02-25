@@ -1,66 +1,52 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 6: Exploring the Training Dataframe"
+author: "Group A: Eli Polzer, Matt Futia, Mia McReynolds"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
+editor_options: 
+  chunk_output_type: inline
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
 #knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
-
-## This exercise links to Module 2.6
-
-Submit the completed exercise to us at:
-
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #5.  Hopefully you saved those combined presence:absence dataframe, or regrettably you will need to return to exercise #5 and re--build that dataframe.
-
-The goal is to examine the characteristics of the extracted predictor variable values as a part of the SDHM analytical process to possibly eliminate some variables from the models.
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
-
-## The Data
-
-* The dataframe completed in exercise #5.
-
----
+```{r}
+# some pathnames; yours will be specific to your CPU !!
+  path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
+  
+# below is the recommended class root dir
+  #path.root <- "~/sdhmR-V2021.1"  # typical class root dir
+  path.mod2 <- paste(path.root, "/data/module02", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+  
+# some libraries
+  library(readr)
+  library(ggplot2)
+  library(dplyr)
+  library(sf)
+```
 
 ## Question #1
 
 * Break the predictor variables into logical groups of **topography**, **temperature**, and **precipitation**.  Do this by creating a new column called **`pred_type`** and add it the dataframe.
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+setwd(path.mod2)
+pied.trTOPO <- read_csv("pied_trTOPO.csv")
+colnames(pied.trTOPO)
 ```
+I'm not going to add a new column, to preserve data structure, but groupings and column numbers are (based on the HTML doc): 
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+**topography** = "exp1nrm.img"    "exp3nrm.img"    "exp5nrm.img" "prad_sw_di.img" "rough_1k.img"  "topos.img" = [,c(8:10,12,15,20)]
+
+**temperature** =   "tave_s_hal.img" "tave_sprin.img" "tmax_s_hal.img" "tmax_summe.img" = [,16:19]
+
+**precipitation** = "etpt_5.img", "etpt_6.img", "etpt_sprin.img" "prec_w_hal.img" "prec_winte.img" "mind_yr_av.img" = [,c(5:7,13:14,11)]
+
 
 ---
 
@@ -69,20 +55,202 @@ If King's English interpretation is required, it will go here, after each code c
 * Assess correlations:
   * Among all variables; and
   * Within each of the logical groupings created above
+  
+```{r}
+# numeric correlations
+  cut.point <- 0.7 # set cutpoint for correlation
+  c1 <- cor(pied.trTOPO[, c(5:20)], use = "pairwise.complete.obs", 
+    method = "spearman") # est. correlation
+  c1 # examine
+  c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
+  c2 # examine; FALSE indicates cor<cutpoint 
+
+# START MODIFIED panel.cor CORRELATION FUNCTION		   
+panel.cor <- function(x, y, digits=2, prefix="", cex.cor) 
+  { usr <- par("usr"); on.exit(par(usr)) 
+    par(usr = c(0, 1, 0, 1)) 
+    r <- abs(cor(x, y, use = "pairwise.complete.obs")) 
+    txt <- format(c(r, 0.123456789), digits=digits)[1] 
+    txt <- paste(prefix, txt, sep="") 
+    if(missing(cex.cor)) cex <- 0.8/strwidth(txt) 
+
+    test <- cor.test(x,y) 
+    # borrowed from printCoefmat
+    Signif <- symnum(test$p.value, corr = FALSE, na = FALSE, 
+                  cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                  symbols = c("***", "**", "*", ".", " ")) 
+
+    text(0.5, 0.5, txt, cex = cex * r)
+    text(.8, .8, Signif, cex=cex, col=2) 
+  }
+
+# plot correlations using modified panel.cor function
+  pairs(pied.trTOPO[, c(5:20)], lower.panel = panel.smooth,
+  upper.panel = panel.cor, main = "Topo Variables")
+
+```
+  
+The panel plot of all variables' correlations is pretty hard to see here, but zooming in it looks like several are correlated, and several have "significant" but unimportant correlations. I'll look at groups of predictors for a better examination of correlations. 
+
+
+```{r}
+# numeric correlations
+  cut.point <- 0.7 # set cutpoint for correlation
+  c1 <- cor(pied.trTOPO[,c(8:10,12,15,20)], use = "pairwise.complete.obs", 
+    method = "spearman") # est. correlation
+  c1 # examine
+  c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
+  c2 # examine; FALSE indicates cor<cutpoint 
+
+# plot correlations using modified panel.cor function
+  pairs(pied.trTOPO[,c(8:10,12,15,20)], lower.panel = panel.smooth,
+  upper.panel = panel.cor, main = "Topo Variables")
+```
+
+First, topography: exp1 and exp3, exp3 and exp5, exp5 and topos are strongly correlated. 
+
+```{r}
+# numeric correlations
+  cut.point <- 0.7 # set cutpoint for correlation
+  c1 <- cor(pied.trTOPO[,c(16:19)], use = "pairwise.complete.obs", 
+    method = "spearman") # est. correlation
+  c1 # examine
+  c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
+  c2 # examine; FALSE indicates cor<cutpoint 
+
+# plot correlations using modified panel.cor function
+  pairs(pied.trTOPO[,c(16:19)], lower.panel = panel.smooth,
+  upper.panel = panel.cor, main = "Temp Variables")
+```
+
+Second, temperature: all of these variables are significantly correlated. 
+
+```{r}
+# numeric correlations
+  cut.point <- 0.7 # set cutpoint for correlation
+  c1 <- cor(pied.trTOPO[,c(5:7,13:14,11)], use = "pairwise.complete.obs", 
+    method = "spearman") # est. correlation
+  c1 # examine
+  c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
+  c2 # examine; FALSE indicates cor<cutpoint 
+
+# plot correlations using modified panel.cor function
+  pairs(pied.trTOPO[,c(5:7,13:14,11)], lower.panel = panel.smooth,
+  upper.panel = panel.cor, main = "Precip Variables")
+```
+
+Third, precipitation: etpt 5, 6, and spring were all correlated. prec_w_hal and prec_winter were correlated. ALso a lot of others had moderate correlation around 0.5-0.6, a little lower than the 0.7 cutoff but still should be considered. 
+
 
 ---
 
 ## Question #3
 
-* Examine variable importance of each predictor variable as related to presence:absence using the process described in the Module.
+* Examine variable importance of each predictor variable as related to presence:absence using the process described in the Module. (Within each of the variable groups). 
+
+```{r}
+#### START function variable importance
+varimp.glm <- function(tr.spp, tr.var, pres, pf, pl) {
+  tmp.mat <- matrix(ncol = 2, nrow = (pl - pf + 1))
+  for (i in pf:pl) {
+    # option: linear+quadratic; linear only
+    tmp <- glm(tr.spp[, pres] ~ tr.var[, i] + I((tr.var[, i])^2), na.action = na.omit, 
+      family = binomial)
+    # linear only glm
+    #tmp <- glm(tr.spp[, pres] ~ tr.var[, i], na.action = na.omit, family = binomial)
+    tmp.mat[(i - pf + 1), 1] <- tmp$aic
+    tmp.mat[(i - pf + 1), 2] <- (1 - (tmp$deviance/tmp$null.deviance))
+    }
+  return(tmp.mat)
+  } 
+#### END function variable importance
+```
+
+```{r}
+# estimate VIP values => AIC & Adj deviance
+  tr.vip <- as.data.frame(pied.trTOPO[,c(2, 8:10,12,15,20)]) # keep only P/A & predictors - had to make this a df to get GLM to work
+  pres <- 1 # column for presence:absence
+  v.start <- 2 # column start predictor variables
+  v.stop <- ncol(tr.vip) # last column predictor variables
+  v.num <- v.stop - 1 # number predictor variables
+  dev.fit <- varimp.glm(tr.vip, tr.vip, pres, v.start, v.stop) # call VIP function
+  dev.fit # output matrix; col=1 AIC, col=2 Adj deviance 
+
+# built basic barplot if desired
+  d.max <- ceiling(signif(max(dev.fit[, 2]), 2) * 10)/10 # max of y-axis
+  ylim.r <- range(0, d.max) # range y-axis
+  x.labs <- names(tr.vip[2:v.stop]) # x-axis labels
+ 
+   barplot(dev.fit[, 2], col = "darkgreen", ylim = ylim.r, main = "topo VIPs", 
+    ylab = "adj.D2", names = x.labs) # barplot
+  abline(h = 0) # add horizontal line
+  abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev 
+```
+The most important topo variable is rough_1k. 
+
+```{r}
+# estimate VIP values => AIC & Adj deviance
+  tr.vip <- as.data.frame(pied.trTOPO[,c(2, 16:19)]) # keep only P/A & predictors - had to make this a df to get GLM to work
+  pres <- 1 # column for presence:absence
+  v.start <- 2 # column start predictor variables
+  v.stop <- ncol(tr.vip) # last column predictor variables
+  v.num <- v.stop - 1 # number predictor variables
+  dev.fit <- varimp.glm(tr.vip, tr.vip, pres, v.start, v.stop) # call VIP function
+  dev.fit # output matrix; col=1 AIC, col=2 Adj deviance 
+
+# built basic barplot if desired
+  d.max <- ceiling(signif(max(dev.fit[, 2]), 2) * 10)/10 # max of y-axis
+  ylim.r <- range(0, d.max) # range y-axis
+  x.labs <- names(tr.vip[2:v.stop]) # x-axis labels
+ 
+   barplot(dev.fit[, 2], col = "darkgreen", ylim = ylim.r, main = "temp VIPs", 
+    ylab = "adj.D2", names = x.labs) # barplot
+  abline(h = 0) # add horizontal line
+  abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev 
+```
+Most important temp variable is tmax_s_hal. Will work to select just this one since they're all correlated. 
+
+```{r}
+# estimate VIP values => AIC & Adj deviance
+  tr.vip <- as.data.frame(pied.trTOPO[,c(2,5:7,13:14,11)]) # keep only P/A & predictors - had to make this a df to get GLM to work
+  pres <- 1 # column for presence:absence
+  v.start <- 2 # column start predictor variables
+  v.stop <- ncol(tr.vip) # last column predictor variables
+  v.num <- v.stop - 1 # number predictor variables
+  dev.fit <- varimp.glm(tr.vip, tr.vip, pres, v.start, v.stop) # call VIP function
+  dev.fit # output matrix; col=1 AIC, col=2 Adj deviance 
+
+# built basic barplot if desired
+  d.max <- ceiling(signif(max(dev.fit[, 2]), 2) * 10)/10 # max of y-axis
+  ylim.r <- range(0, d.max) # range y-axis
+  x.labs <- names(tr.vip[2:v.stop]) # x-axis labels
+ 
+   barplot(dev.fit[, 2], col = "darkgreen", ylim = ylim.r, main = "precip VIPs", 
+    ylab = "adj.D2", names = x.labs) # barplot
+  abline(h = 0) # add horizontal line
+  abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev 
+```
+Most important are eptp_5, etpt_6, adn mind_yr_av. 
 
 ---
 
 ## Question #4
 
-* Eliminate redundant variables with a goal of retaining 7-10 of the 16 available
+* Eliminate redundant variables with a goal of retaining 7-10 of the 16 available (keeping at least a couple in each of the categories)
 * Justify your decision(s) to keep / remove variables using bullets
 
+```{r}
+pied.tr_MORT <- pied.trTOPO %>% 
+  select(FNETID, SPPRES106, tr.wgs_x, tr.wgs_y, prad_sw_di.img, rough_1k.img, tmax_s_hal.img, tave_s_hal.img, etpt_6.img, prec_w_hal.img, mind_yr_av.img)
+```
+
+* prad sw di: average significance for the topo group, but uncorrelated to rough 1K, so I'm comfortable including it. 
+* rough 1k: By far most significant VIP for the topo group. 
+* tmax s hal: maximum temperature for April-September addresses hottest season of the year. All temperature vars had a similar importance, and all were strongly correlated, so I will select just one of them from this suite. 
+* tave_s_hal: correlated to tmax, but I'd assume that this is average temp over the growing season, so I'll include it to hit requirement of a couple vars per category. Or, could say that this is from expert opinion. 
+* etpt 6: all 3 evapotranspiration variables were highly correlated, but this one had highest VIP factor. 
+* prec w half: higher VIP than precip winter, and highly correlated, so I'll choose this one. 
+* mind_yr_av: highly correlated to etpt vars, and a moisture index that is likely modeled, so this is my reluctant 7th choice for variables list. Has a high VIP though. 
 ---
 
 ## Question #5
@@ -95,6 +263,17 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used as we next begin the SDHM model constructions.
+
+```{r}
+# write out data files if desired
+  setwd(path.mod2)
+  write.csv(pied.tr_MORT, file = "pied.tr_MORT.csv", row.names = F) # save .csv - training data
+  # save(pied.tr_MORT, file = "pied.tr_MORT.RData") # save .RData - pres/abs plus stacked raster
+  save(pied.tr_MORT, file = "pied.tr_MORT.RData") # save .RData - stacked raster
+  st_write(pied.tr_MORT, dsn = ".", layer = "pied.tr_MORT", driver = "ESRI Shapefile",
+    delete_layer = T, delete_dsn = T)#point shapefile in ESRI format
+```
+
 
 ---
 
