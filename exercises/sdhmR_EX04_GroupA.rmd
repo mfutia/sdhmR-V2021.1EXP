@@ -114,7 +114,7 @@ t1 <- terra::rast("templateR_wgs.img")
 
 # extract buffered points from template & rasterize
   rang.bufSP <- as_Spatial(rang.bufSF) # convert to sp spatialpolygon class
-  rang.bufptR <- crop(rasterize(rang.bufSP, t1), rang.bufSP) # t1 is template from above
+  rang.bufptR <- crop(raster(rang.bufSP, t1), rang.bufSP) # t1 is template from above
   rang.bufptR # examine
 
    #how do you plot a raster in ggplot?
@@ -215,6 +215,12 @@ The dimensions check out, and I think the CRS is successfully set to WGS84.
   table(tru.bufptFNET$bufpt.fnetid)[[1]] # number of FNETIDs in rang.bufptR
   length(which(is.na(tru.bufptFNET$bufpt.fnetid))) # No. NAs -- This all checks out -AM
 ```
+
+```{r}
+#write rang.bufptR to a .img file
+writeRaster(pied.range.bufSF, filename = "pied.range.bufSF", format = "HFA", overwrite = T) 
+```
+
 
 ```{r}
 # START MERGE SPP LOCATION, MODELLING FRAME, ALL BY FISHNET ID'S 
@@ -342,7 +348,7 @@ psu.srs2$in.modFR <- 1  # assign 1 to in.modFR
   save(rang.PPsA, file = "rang.PPsA.RData") # save .RData
   
   st_write(rang.bufSP, dsn = ".", layer = "rang.bufSP", driver = "ESRI Shapefile",
-    delete_layer = T, delete_dsn = T) # output shapefile - writeOGR is outdated
+    delete_layer = T, delete_dsn = T) # output shapefile
 ```
 
 
