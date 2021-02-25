@@ -1,52 +1,56 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 5: Building the Training Dataframe"
+author: "Group A: Eli Polzer, Matt Futia, Mia McReynolds"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r}
+# some pathnames; yours will be specific to your CPU !!
+  path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
+  
+# below is the recommended class root dir
+  #path.root <- "~/sdhmR-V2021.1"  # typical class root dir
+  path.mod2 <- paste(path.root, "/data/module02", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
 
-## This exercise links to Module 2.5
+# some libraries
+  library(raster)	# FXNS:	raster, projection, projectRaster, extract, crop
+  library(readr)
+  library(ggplot2)
+  library(dplyr)
+   library(sf)    
+```
 
-Submit the completed exercise to us at:
 
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
+```{r, message=FALSE}
+#import range-wide data
+  spp106pr_RANG <- read_csv("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/traindat/spp106pr_RANG.csv")
 
----
+#add proj string for WGS 84
+prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
 
-## Context
+  
+#load presence/absence data 
+  # setwd(path.mod2) - not working?
+  pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.PPsA.RData")) 
+  # load presence:absence data
+  head(pres.abs, 2) # examine
+```
+  
+```{r}
+  load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.framesR.RData") 
 
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #4.  This exercise relies on the pseudo--absence values you generated in exercise #4, and then subsequently added to the data presence values dataframe.  Hopefully you saved those combined presence:absence dataframe, or regrettably you will need to return to exercise #4 and re--build that dataframe.
+  pied.bufptR # examine cropping raster
+  plot(pied.bufptR) # examine raster plot
+```
 
-The goal is to use the dataframe consisting of the presence:absence [X,Y]'s from exercise #4, and "punch" those [X,Y]'s through a stack of environmental predictor variables.  The extracted values are to be added to the exercise #4 dataframe, creating a new dataframe consisting of the: 
-
-* FNETID ID, 
-* the [X,Y]'s in the correct CRS, 
-* the presence:absence coded as [0=absence, 1=presence], and 
-* the predictor values associated with [X,Y] in the dataframe.
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
 
 ## The Data
 
@@ -64,14 +68,23 @@ Remember, you will have been assigned data for *edulis* having one the following
 
 * Import the predictor GIS variables into R
 
-```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+```{r, message=FALSE}
+#run this entire chunk at one time
+ setwd("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/preds")
+img.list <- list.files(pattern = ".img$") # list of .img files; $ strips extra
+img.list # examine
+
+# loop for extracting topo data w/raster stack
+  layers <- {} # initialize (empty) list of raster layers
+  for (i in 1:length(img.list)) {
+    r1 <- crop(raster(img.list[i]), pied.bufptR) # crop pred var raster to buffer raster
+    names(r1) <- strsplit(img.list[i], "_wgs.img") # assign name to raster
+   layers <- c(layers, r1) # add raster to layer of rasters
+  }
+  layers # examine raster stack; return is a list of raster layers
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+It looks like all CRS's of rasters are WGS84, so I won't have to re-project. Also all resolutions are the same, 0.0083 x 0.0083. 
 
 ---
 
@@ -79,11 +92,54 @@ If King's English interpretation is required, it will go here, after each code c
 
 * Extract predictor variables from all 16 **`.img`** files using the presence:absence [X,Y]'s
 
+```{r}
+# build the raster stack
+  pied.topoDOM <- stack(layers) # create a raster stack
+  pied.topoDOM # examine stack
+
+# extract from stack 
+  t1 <- extract(pied.topoDOM, pres.abs[, c("tr.wgs_x", "tr.wgs_y")]) # extract values from raster stack
+  head(t1, 2) # examine extracted matrix
+```
+Looks good: all 16 rasters are there, and resolution/CRS are preserved. 
+
 ---
 
 ## Question #3
 
 * Create a new dataframe by binding the extracted predictor variable values to the dataframe from exercise #4.
+
+```{r}
+  pied.trTOPO <- cbind(pres.abs, t1) %>% # bind to train dataframe
+    select(-c(wgs_xF, wgs_yF, cell.wgs_x, cell.wgs_y))
+
+  head(pied.trTOPO, 2) # examine training data frame
+```
+
+I removed the wgs_xF and cell.wgs_x columns, since all coords are in tr.wgs_x. 
+
+```{r}
+ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
+  geom_point(aes(color=prec_winte.img)) +
+  theme_classic()
+```
+
+A plot for fun, winter precipitation. Looks reasonable. 
+
+```{r}
+ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
+  geom_point(aes(color=rough_1k.img)) +
+  theme_classic()
+```
+
+Assuming this is some kind of elevation layer? Looks like some of these predictors will be correlated. 
+
+```{r}
+ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
+  geom_point(aes(color=factor(SPPRES106))) +
+  theme_classic()
+```
+Based on these maps, this species prefers higher-elevation sites. 
 
 ---
 
@@ -96,6 +152,17 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used in the next exercise #6.
+
+```{r}
+
+# write out data files if desired
+  setwd(path.mod2)
+  write.csv(pied.trTOPO, file = "pied_trTOPO.csv", row.names = F) # save .csv - training data
+  save(pied.trTOPO, file = "pied.trTOPO.RData") # save .RData - pres/abs plus stacked raster
+  save(pied.topoDOM, file = "pied.topoDOM.RData") # save .RData - stacked raster
+  st_write(pied.trTOPO, dsn = ".", layer = "pied.trTOPO", driver = "ESRI Shapefile",
+    delete_layer = T, delete_dsn = T)#point shapefile in ESRI format
+```
 
 ---
 
