@@ -1,0 +1,213 @@
+---
+title: "Building Training Dataset"
+author: "Eli L. Polzer"
+date: "25 February 2021"
+output: html_document
+---
+--> 
+```{r}
+path.root <- "C:/Users/epolzer/Documents/sdhmR-V2021.1"
+path.dat <- paste(path.root, "/sdhmR-V2021.1EXP/Data/exercise/traindat", sep = "")
+path.mod2 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module02", sep = "")
+path.gis <- paste(path.root, "/sdhmR-V2021.1EXP/Data/gis_layers", sep = "")
+path.figs <- paste(path.root, "/sdhmR-V2021.1EXP/Figures", sep = "")
+path.prj <- paste(path.root, "/sdhmR-V2021.1EXP/R_Code", sep = "")
+
+## Source course CRSs:
+setwd(path.prj)
+source("prjs4_sdhmR.R") # source course CRSs
+ls(pattern = "prj.")
+
+library(raster)
+library(sf)
+
+## Load data:
+setwd(path.dat)
+tru.range <- read.csv("spp106pr_RANG_2.csv")
+
+setwd(path.mod2)
+range.PPsA <- get(load("pied.PPsA.RData"))
+
+setwd(path.mod2)
+range.bufR <- get(load("pied.framesR.RData"))
+range.bufSF <- get(load("pied.framesSF.RData"))
+range.bufSP <- get(load("pied.framesSP.RData"))
+range.bufpt <- get(load("pied.framesbufpt.RData"))
+
+range.indexFNET <- get(load("range.indexFNET.RData"))
+range.ppsAx <- get(load("range_pres.psu.RData"))
+p2.sppx <- get(load("range_pres.psu.RData"))
+p2.modFRx <- get(load("range_pres.psu.RData"))
+psu.bufptx <- get(load("range_pres.psu.RData"))
+```
+
+---
+## Question #1
+
+* Import the predictor GIS variables into R
+
+```{r}
+# Joint import of predictor GIS variables into R:
+setwd("C:/Users/epolzer/Documents/sdhmR-V2021.1/sdhmR-V2021.1EXP/Data/exercise/preds")
+env.list <- list.files(pattern = ".img$") 
+env.list 
+layers <- {} 
+for (i in 1:length(env.list)) {
+  r1 <- crop(raster(env.list[i]), range.bufptR) 
+  names(r1) <- strsplit(env.list[i], "_wgs.img") 
+  layers <- c(layers, r1)
+}
+layers
+
+# Individual import:
+etpt5 <- raster("etpt_5.img")
+etpt6 <- raster("etpt_6.img")
+etptsprin <- raster("etpt_sprin.img") 
+exp1nrm <- raster("exp1nrm.img") 
+exp3nrm <- raster("exp3nrm.img") 
+exp5nrm <- raster("exp5nrm.img")
+mindyrav <- raster("mind_yr_av.img")
+pradswdi <- raster("prad_sw_di.img") 
+precwhal <- raster("prec_w_hal.img") 
+precwinte <- raster("prec_winte.img") 
+taveshal <- raster("tave_s_hal.img") 
+tavesprin <- raster("tave_sprin.img") 
+tmaxshal <- raster("tmax_s_hal.img") 
+tmaxsumme <- raster("tmax_summe.img") 
+rough <- raster("rough_1k.img") 
+topos <- raster("topos.img") 
+```
+
+---
+
+## Question #2
+
+* Extract predictor variables from all 16 **`.img`** files using the presence:absence [X,Y]'s
+```{r}
+ # Individual extract:
+setwd(path.mod2)
+range.bufR <- get(load("pied.framesR.RData"))
+range.bufSF <- get(load("pied.framesSF.RData"))
+range.bufSP <- get(load("pied.framesSP.RData"))
+range.bufpt <- get(load("pied.framesbufpt.RData"))
+
+range.indexFNET <- get(load("range.indexFNET.RData"))
+range.ppsAx <- get(load("range_pres.psu.RData"))
+p2.sppx <- get(load("range_pres.psu.RData"))
+p2.modFRx <- get(load("range_pres.psu.RData"))
+psu.bufptx <- get(load("range_pres.psu.RData"))
+
+et1 <- extract(etpt5, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(et1)  
+length(which(is.na(et1)))
+
+et2 <- extract(etpt6, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(et2)  
+length(which(is.na(et1)))
+
+et3 <- extract(etptsprin, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(et3)  
+length(which(is.na(et1)))
+
+ex1 <- extract(exp1nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(ex1)  
+length(which(is.na(et1)))
+
+ex3 <- extract(exp3nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(ex3)  
+length(which(is.na(et1)))
+
+ex5 <- extract(exp5nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(ex5)  
+length(which(is.na(et1)))
+
+mi1 <- extract(mindyrav, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(mi1)  
+length(which(is.na(et1)))
+
+pd1 <- extract(pradswdi, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])   
+length(pd1)  
+length(which(is.na(et1)))
+
+pe1 <- extract(precwhal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")]) 
+length(pe1) 
+length(which(is.na(et1)))
+
+pe2 <- extract(precwinte, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+length(pe2) 
+length(which(is.na(et1)))
+
+ta1 <- extract(taveshal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")]) 
+length(ta1) 
+length(which(is.na(et1)))
+
+ta2 <- extract(tavesprin, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])  
+length(ta2) 
+length(which(is.na(et1)))
+
+tm1 <- extract(tmaxshal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+length(tm1) 
+length(which(is.na(et1)))
+
+tm2 <- extract(tmaxsumme, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+length(tm2) 
+length(which(is.na(et1)))
+
+ro1 <- extract(rough, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")]) 
+length(ro1) 
+length(which(is.na(et1)))
+
+to1 <- extract(topos, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")]) 
+length(to1) 
+length(which(is.na(et1)))
+
+# Joint extract:
+range.var <- stack(layers) 
+range.var 
+d1 <- extract(range.var, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")]) 
+head(d1, 2) 
+length(which(is.na(d1)))
+```
+
+---
+
+## Question #3
+
+* Create a new dataframe by binding the extracted predictor variable values to the dataframe from exercise #4.
+```{r}
+# Individual bind: 
+
+range.train.ind <- cbind(range.PPsA, et1, et2, et3, ex1, ex3, ex5, mi1, pd1, pe1, pe2, ta1, ta2, tm1, tm2, ro1, to1)
+head(range.train.ind, 2)
+length(range.train.ind)
+
+# Joint/Stacked bind:
+d1 <- extract(range.var, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")]) 
+head(d1, 2) 
+range.train <- cbind(range.PPsA, d1)
+head(range.train, 2) 
+length(range.train)
+```
+
+---
+
+## Question #4
+
+* Save your data as R objects:
+  * Dataframe;
+  * Point shapefile with geometry in R
+  * Export as a point shapefile in ESRI format
+* Save these R objects in a **`.RData`** file
+```{r}
+setwd(path.mod2)
+write.csv(range.train, file = "range.train.csv", row.names = F)
+write.csv(range.train.ind, file = "range.train.ind.csv", row.names = F)
+save(range.train, file = "range.train.RData")
+save(range.train.ind, file = "range.train.ind.RData")
+```
+
+---
+
+## The End
+
+---
