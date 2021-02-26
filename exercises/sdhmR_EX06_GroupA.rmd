@@ -38,12 +38,12 @@ load(paste(path.mod2, "/range_pres_psu_data.RData", sep = ""))
 ```
 
 ```{r}
-all_data = range_PPsA_Data
-pred_groups = data.frame(names(all_data[,27:42]))
+all_data = range_PPsA_ShortData
+pred_groups = data.frame(names(all_data[,18:33]))
 names(pred_groups) = "Variable"
-topo = c("exp1","exp3","exp5","prad","rough","topo")
-temp = c("tave1","tave2","tmax1","tmax2")
-precip = c("et5","et6","ets","mind","prec1","prec2")
+topo = c("exp1nrm","exp3nrm","exp5nrm","prad_sw_di","rough_1k","topos")
+temp = c("tave_s_hal","tave_sprin","tmax_s_hal","tmax_summe")
+precip = c("etpt_5","etpt_6","etpt_sprin","mind_yr_av","prec_w_hal","prec_winte")
 pred_groups$pred_type = if_else(pred_groups$Variable %in% topo,"topography",
                                 if_else(pred_groups$Variable %in% temp,"temperature", "precipitation"))
 ```
@@ -60,7 +60,7 @@ pred_groups$pred_type = if_else(pred_groups$Variable %in% topo,"topography",
 cut.point <- 0.7
 
 ### Correlations among all variables
-c1 <- cor(all_data[, c(27:42)], use = "pairwise.complete.obs", method = "spearman")
+c1 <- cor(all_data[, c(18:33)], use = "pairwise.complete.obs", method = "spearman")
 c1
 c2 <- subset(c1 > cut.point | c1 < -cut.point)
 c2
@@ -101,7 +101,7 @@ varimp.glm <- function(tr.spp, tr.var, pres, pf, pl) {
   return(tmp.mat)
 } 
 
-tr.vip <- all_data[, c(2, 27:42)]
+tr.vip <- all_data[, c(2, 18:33)]
 pres <- 1
 v.start <- 2
 v.stop <- ncol(tr.vip)
@@ -114,6 +114,7 @@ dev.fit1 <- dev.fit[order(dev.fit$pred_type),]
 dev.fit$Variable <- factor(dev.fit$Variable, 
                            levels = dev.fit$Variable[order(dev.fit$pred_type)])
 
+# Plot AdjDeviance by group
 ggplot()+
   geom_col(data = dev.fit, aes(Variable, AdjDeviance, fill = pred_type))+
   scale_y_continuous(limits = c(0,0.16), expand = c(0,0))+
@@ -124,7 +125,7 @@ ggplot()+
 ```
 
 ```
-From the precipitation variables, etpt_5 and mind_yr_av have similarly high adjusted deviance. Based on temperature, tmax_summe has the highest adjusted deviance. Lastly, based on topography, rough_1k has the highest adjusted deviance.
+From the precipitation variables, etpt_5 and mind_yr_av have similarly high adjusted deviance. Based on temperature, tmax_s_hal has the highest adjusted deviance. Lastly, based on topography, rough_1k has the highest adjusted deviance.
 ```
 
 ---
@@ -135,12 +136,12 @@ From the precipitation variables, etpt_5 and mind_yr_av have similarly high adju
 * Justify your decision(s) to keep / remove variables using bullets
 
 ```{r}
-remove = c("et6", "ets", "prec2", "tave1", "tave2", "tmax2", "exp1", "exp3", "exp5")
+remove = c("etpt_6", "etpt_sprin", "prec_winte", "tave_s_hal", "tave_sprin", "tmax_summe", "exp1nrm", "exp3nrm", "exp5nrm")
 tr_RANG = dplyr::select(all_data, !one_of(remove))
 ```
 
 ```
-From the precipiation variables, I elimiated etpt_6, and etpt_sprin because they are highly correlated with mind_yr_av and have lower adjusted deviance. I also eliminated prec_w_hal because of its strong correlation with prec_winte and the lower adjusted variance. Of the temperature variables, I only retained tmax_summer because it is highly correlated with the other three temperature variables and has the highest adjusted deviance. Lastly, I eliminated the topographic variables exp1nrm, exp3nrm, and exp5nrm due to their low adjusted deviance.
+From the precipiation variables, I elimiated etpt_6, and etpt_sprin because they are highly correlated with mind_yr_av and have lower adjusted deviance. I also eliminated prec_winte because of its strong correlation with prec_w_hal and the lower adjusted variance. Of the temperature variables, I only retained tmax_s_hal because it is highly correlated with the other three temperature variables and has the highest adjusted deviance. Lastly, I eliminated the topographic variables exp1nrm, exp3nrm, and exp5nrm due to their low adjusted deviance.
 ```
 
 ---
@@ -162,7 +163,7 @@ tr_RANG_SF <- st_as_sf(tr_RANG, coords = c("tr.wgs_x", "tr.wgs_y"), crs = prj.wg
 
 setwd(path.mod2)
 save(tr_RANG, tr_RANG_SF, file = "tr_RANG.Rdata")
-st_write(tr_RANG_SF, dsn = ".", layer = "tr_RANG_SF", driver = "ESRI Shapefile", delete_layer = T, delete_dsn = T)
+st_write(tr_RANG, dsn = ".", layer = "tr_RANG_SF", driver = "ESRI Shapefile", delete_layer = T, delete_dsn = T)
 ```
 
 ---

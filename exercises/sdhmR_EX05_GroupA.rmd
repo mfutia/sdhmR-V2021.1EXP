@@ -44,41 +44,54 @@ setwd(path.root)
 rastlist <- list.files(path = "data/exercise/preds", pattern='.img$', 
 all.files=TRUE, full.names=FALSE)
 
-etpt_5 <- raster(paste("data/exercise/preds/", rastlist[1], sep = ""))
-etpt_6 <- raster(paste("data/exercise/preds/", rastlist[2], sep = ""))
-etpt_sprin <- raster(paste("data/exercise/preds/", rastlist[3], sep = ""))
-exp1nrm <- raster(paste("data/exercise/preds/", rastlist[4], sep = ""))
-exp3nrm <- raster(paste("data/exercise/preds/", rastlist[5], sep = ""))
-exp5nrm <- raster(paste("data/exercise/preds/", rastlist[6], sep = ""))
-mind_yr_av <- raster(paste("data/exercise/preds/", rastlist[7], sep = ""))
-prad_sw_di <- raster(paste("data/exercise/preds/", rastlist[8], sep = ""))
-prec_w_hal <- raster(paste("data/exercise/preds/", rastlist[9], sep = ""))
-prec_winte <- raster(paste("data/exercise/preds/", rastlist[10], sep = ""))
-rough_1k <- raster(paste("data/exercise/preds/", rastlist[11], sep = ""))
-tave_s_hal <- raster(paste("data/exercise/preds/", rastlist[12], sep = ""))
-tave_sprin <- raster(paste("data/exercise/preds/", rastlist[13], sep = ""))
-tmax_s_hal <- raster(paste("data/exercise/preds/", rastlist[14], sep = ""))
-tmax_summe <- raster(paste("data/exercise/preds/", rastlist[15], sep = ""))
-topos <- raster(paste("data/exercise/preds/", rastlist[16], sep = ""))
+buffer = range.bufptR
 
-# Check if CRSs match
-projection(etpt_5)
-projection(etpt_6)
-projection(etpt_sprin)
-projection(exp1nrm)
-projection(exp3nrm)
-projection(exp5nrm)
-projection(mind_yr_av)
-projection(prad_sw_di)
-projection(prec_w_hal)
-projection(prec_winte)
-projection(rough_1k)
-projection(tave_s_hal)
-projection(tave_sprin)
-projection(tmax_s_hal)
-projection(tmax_summe)
-projection(topos)
-# all same projection (prj.wgs84)
+setwd("C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/exercise/preds")
+layers <- {}
+for (i in 1:length(rastlist)) {
+  r1 <- crop(raster(rastlist[i]), buffer)
+  names(r1) <- strsplit(rastlist[i], "_wgs.img")
+  layers <- c(layers, r1)
+}
+layers
+```
+
+```{r, include=FALSE}
+# etpt_5 <- raster(paste("data/exercise/preds/", rastlist[1], sep = ""))
+# etpt_6 <- raster(paste("data/exercise/preds/", rastlist[2], sep = ""))
+# etpt_sprin <- raster(paste("data/exercise/preds/", rastlist[3], sep = ""))
+# exp1nrm <- raster(paste("data/exercise/preds/", rastlist[4], sep = ""))
+# exp3nrm <- raster(paste("data/exercise/preds/", rastlist[5], sep = ""))
+# exp5nrm <- raster(paste("data/exercise/preds/", rastlist[6], sep = ""))
+# mind_yr_av <- raster(paste("data/exercise/preds/", rastlist[7], sep = ""))
+# prad_sw_di <- raster(paste("data/exercise/preds/", rastlist[8], sep = ""))
+# prec_w_hal <- raster(paste("data/exercise/preds/", rastlist[9], sep = ""))
+# prec_winte <- raster(paste("data/exercise/preds/", rastlist[10], sep = ""))
+# rough_1k <- raster(paste("data/exercise/preds/", rastlist[11], sep = ""))
+# tave_s_hal <- raster(paste("data/exercise/preds/", rastlist[12], sep = ""))
+# tave_sprin <- raster(paste("data/exercise/preds/", rastlist[13], sep = ""))
+# tmax_s_hal <- raster(paste("data/exercise/preds/", rastlist[14], sep = ""))
+# tmax_summe <- raster(paste("data/exercise/preds/", rastlist[15], sep = ""))
+# topos <- raster(paste("data/exercise/preds/", rastlist[16], sep = ""))
+# 
+# # Check if CRSs match
+# projection(etpt_5)
+# projection(etpt_6)
+# projection(etpt_sprin)
+# projection(exp1nrm)
+# projection(exp3nrm)
+# projection(exp5nrm)
+# projection(mind_yr_av)
+# projection(prad_sw_di)
+# projection(prec_w_hal)
+# projection(prec_winte)
+# projection(rough_1k)
+# projection(tave_s_hal)
+# projection(tave_sprin)
+# projection(tmax_s_hal)
+# projection(tmax_summe)
+# projection(topos)
+# # all same projection (prj.wgs84)
 ```
 
 ---
@@ -88,23 +101,36 @@ projection(topos)
 * Extract predictor variables from all 16 **`.img`** files using the presence:absence [X,Y]'s
 
 ```{r}
-# Extract values for each raster layer
-et5 <- extract(etpt_5, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-et6 <- extract(etpt_6, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-ets <- extract(etpt_sprin, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-exp1 <- extract(exp1nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-exp3 <- extract(exp3nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-exp5 <- extract(exp5nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-mind <- extract(mind_yr_av, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-prad <- extract(prad_sw_di, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-prec1 <- extract(prec_w_hal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-prec2 <- extract(prec_winte, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-rough <- extract(rough_1k, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-tave1 <- extract(tave_s_hal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-tave2 <- extract(tave_sprin, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-tmax1 <- extract(tmax_s_hal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-tmax2 <- extract(tmax_summe, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
-topo <- extract(topos, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# create a raster stack
+rangeDOM <- stack(layers) 
+rangeDOM
+
+# Extracted predictor variables and shorten column names
+t1 <- raster::extract(rangeDOM, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+vars <- sub(".img", "", colnames(t1))
+colnames(t1) <- vars
+head(t1, 2) 
+```
+
+
+```{r, include=F}
+# # Extract values for each raster layer
+# et5 <- extract(etpt_5, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# et6 <- extract(etpt_6, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# ets <- extract(etpt_sprin, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# exp1 <- extract(exp1nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# exp3 <- extract(exp3nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# exp5 <- extract(exp5nrm, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# mind <- extract(mind_yr_av, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# prad <- extract(prad_sw_di, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# prec1 <- extract(prec_w_hal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# prec2 <- extract(prec_winte, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# rough <- extract(rough_1k, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# tave1 <- extract(tave_s_hal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# tave2 <- extract(tave_sprin, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# tmax1 <- extract(tmax_s_hal, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# tmax2 <- extract(tmax_summe, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+# topo <- extract(topos, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
 ```
 
 ---
@@ -113,7 +139,17 @@ topo <- extract(topos, range.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
 
 * Create a new dataframe by binding the extracted predictor variable values to the dataframe from exercise #4.
 ```{r}
-range_PPsA_Data <- cbind(range.PPsA, et5, et6, ets, exp1, exp3, exp5, mind, prad, prec1, prec2, rough, tave1, tave2, tmax1, tmax2, topo)
+### bind presence/pseudoabsence with predictors
+range_PPsA_Data <- cbind(range.PPsA, t1)
+
+### remove columns that only contain NA
+range_PPsA_ShortData <- range_PPsA_Data[,colSums(is.na(range_PPsA_Data))<nrow(range_PPsA_Data)]
+
+head(range_PPsA_Data, 2)
+```
+
+```{r, include=F}
+# range_PPsA_Data <- cbind(range.PPsA, et5, et6, ets, exp1, exp3, exp5, mind, prad, prec1, prec2, rough, tave1, tave2, tmax1, tmax2, topo)
 ```
 
 ---
@@ -130,11 +166,11 @@ These data will be used in the next exercise #6.
 
 ```{r}
 # Convert data.frame to shapefile
-range_data_shp <- st_as_sf(range_PPsA_Data, coords = c("tr.wgs_x", "tr.wgs_y"), crs = prj.wgs84, remove = F)
+range_data_shp <- st_as_sf(range_PPsA_ShortData, coords = c("tr.wgs_x", "tr.wgs_y"), crs = prj.wgs84, remove = F)
 
 setwd(path.mod2)
-save(range_PPsA_Data, range_data_shp, file = "pres_psu_data")
-st_write(range_data_shp, dsn = ".", layer = "range_data_shp", driver = "ESRI Shapefile", delete_layer = T, delete_dsn = T)
+save(range_PPsA_ShortData, range_data_shp, file = "range_pres_psu_data.Rdata")
+st_write(range_PPsA_ShortData, dsn = ".", layer = "range_data_shp", driver = "ESRI Shapefile", delete_layer = T, delete_dsn = T)
 ```
 
 ---
