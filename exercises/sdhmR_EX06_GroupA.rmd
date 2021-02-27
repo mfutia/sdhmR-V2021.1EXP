@@ -4,7 +4,7 @@ author: "Group A: Eli Polzer, Matt Futia, Mia McReynolds"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 ```{r global_options, include=FALSE}
@@ -24,10 +24,10 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
   path.gis <- paste(path.root, "/data/gis_layers", sep = "")
   
 # some libraries
-  library(readr)
-  library(ggplot2)
-  library(dplyr)
   library(sf)
+  library(tidyverse)
+  library(data.table)
+  library(modeest)
 ```
 
 ## Question #1
@@ -36,16 +36,28 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 
 ```{r}
 setwd(path.mod2)
-pied.trTOPO <- read_csv("pied_trTOPO.csv")
-colnames(pied.trTOPO)
+rang.trTOPO <- read_csv("rang.trTOPO.csv") 
+colnames(rang.trTOPO)
 ```
-I'm not going to add a new column, to preserve data structure, but groupings and column numbers are (based on the HTML doc): 
+I'm not going to add a new column, to preserve data structure, but groupings are (based on the HTML doc): 
 
-**topography** = "exp1nrm.img"    "exp3nrm.img"    "exp5nrm.img" "prad_sw_di.img" "rough_1k.img"  "topos.img" = [,c(8:10,12,15,20)]
+**topography** = "exp1nrm.img"    "exp3nrm.img"    "exp5nrm.img" "prad_sw_di.img" "rough_1k.img"  "topos.img" 
 
-**temperature** =   "tave_s_hal.img" "tave_sprin.img" "tmax_s_hal.img" "tmax_summe.img" = [,16:19]
+**temperature** =   "tave_s_hal.img" "tave_sprin.img" "tmax_s_hal.img" "tmax_summe.img" 
 
-**precipitation** = "etpt_5.img", "etpt_6.img", "etpt_sprin.img" "prec_w_hal.img" "prec_winte.img" "mind_yr_av.img" = [,c(5:7,13:14,11)]
+**precipitation** = "etpt_5.img", "etpt_6.img", "etpt_sprin.img" "prec_w_hal.img" "prec_winte.img" "mind_yr_av.img"
+
+Add groupings using Matt's code:
+```{r}
+pred_groups = data.frame(names(rang.trTOPO[,6:21]))
+names(pred_groups) = "Variable"
+topo = c("exp1nrm","exp3nrm","exp5nrm","prad_sw_di","rough_1k","topos")
+temp = c("tave_s_hal","tave_sprin","tmax_s_hal","tmax_summe")
+precip = c("etpt_5","etpt_6","etpt_sprin","mind_yr_av","prec_w_hal","prec_winte")
+( pred_groups$pred_type = if_else(pred_groups$Variable %in% topo,"topography",
+                                if_else(pred_groups$Variable %in% temp,"temperature", "precipitation")) )
+```
+
 
 
 ---
@@ -62,9 +74,14 @@ I'm not going to add a new column, to preserve data structure, but groupings and
   c1 <- cor(pied.trTOPO[, c(5:20)], use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
+```
+
+```{r}
   c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
   c2 # examine; FALSE indicates cor<cutpoint 
+```
 
+```{r}
 # START MODIFIED panel.cor CORRELATION FUNCTION		   
 panel.cor <- function(x, y, digits=2, prefix="", cex.cor) 
   { usr <- par("usr"); on.exit(par(usr)) 
@@ -90,20 +107,20 @@ panel.cor <- function(x, y, digits=2, prefix="", cex.cor)
 
 ```
   
-The panel plot of all variables' correlations is pretty hard to see here, but zooming in it looks like several are correlated, and several have "significant" but unimportant correlations. I'll look at groups of predictors for a better examination of correlations. 
+The panel plot of all variables' correlations is pretty hard to see here, but zooming in it looks like several are correlated, and several have "significant" but unimportant correlations. I'll look at groups of predictors for a better examination of correlations, and come back to this when selecting final set of predictors. 
 
 
 ```{r}
 # numeric correlations
   cut.point <- 0.7 # set cutpoint for correlation
-  c1 <- cor(pied.trTOPO[,c(8:10,12,15,20)], use = "pairwise.complete.obs", 
+  c1 <- cor(dplyr::select(rang.trTOPO, one_of(topo)), use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
   c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
   c2 # examine; FALSE indicates cor<cutpoint 
 
 # plot correlations using modified panel.cor function
-  pairs(pied.trTOPO[,c(8:10,12,15,20)], lower.panel = panel.smooth,
+  pairs(dplyr::select(rang.trTOPO, one_of(topo)), lower.panel = panel.smooth,
   upper.panel = panel.cor, main = "Topo Variables")
 ```
 
@@ -112,14 +129,14 @@ First, topography: exp1 and exp3, exp3 and exp5, exp5 and topos are strongly cor
 ```{r}
 # numeric correlations
   cut.point <- 0.7 # set cutpoint for correlation
-  c1 <- cor(pied.trTOPO[,c(16:19)], use = "pairwise.complete.obs", 
+  c1 <- cor(dplyr::select(rang.trTOPO, one_of(temp)), use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
   c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
   c2 # examine; FALSE indicates cor<cutpoint 
 
 # plot correlations using modified panel.cor function
-  pairs(pied.trTOPO[,c(16:19)], lower.panel = panel.smooth,
+  pairs(dplyr::select(rang.trTOPO, one_of(temp)), lower.panel = panel.smooth,
   upper.panel = panel.cor, main = "Temp Variables")
 ```
 
@@ -128,14 +145,14 @@ Second, temperature: all of these variables are significantly correlated.
 ```{r}
 # numeric correlations
   cut.point <- 0.7 # set cutpoint for correlation
-  c1 <- cor(pied.trTOPO[,c(5:7,13:14,11)], use = "pairwise.complete.obs", 
+  c1 <- cor(dplyr::select(rang.trTOPO, one_of(precip)), use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
   c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
   c2 # examine; FALSE indicates cor<cutpoint 
 
 # plot correlations using modified panel.cor function
-  pairs(pied.trTOPO[,c(5:7,13:14,11)], lower.panel = panel.smooth,
+  pairs(dplyr::select(rang.trTOPO, one_of(precip)), lower.panel = panel.smooth,
   upper.panel = panel.cor, main = "Precip Variables")
 ```
 
@@ -168,69 +185,27 @@ varimp.glm <- function(tr.spp, tr.var, pres, pf, pl) {
 
 ```{r}
 # estimate VIP values => AIC & Adj deviance
-  tr.vip <- as.data.frame(pied.trTOPO[,c(2, 8:10,12,15,20)]) # keep only P/A & predictors - had to make this a df to get GLM to work
+  tr.vip <- as.data.frame(rang.trTOPO[,c(2, 6:21)]) # keep only P/A & predictors - had to make this a df to get GLM to work
   pres <- 1 # column for presence:absence
   v.start <- 2 # column start predictor variables
   v.stop <- ncol(tr.vip) # last column predictor variables
   v.num <- v.stop - 1 # number predictor variables
   dev.fit <- varimp.glm(tr.vip, tr.vip, pres, v.start, v.stop) # call VIP function
-  dev.fit # output matrix; col=1 AIC, col=2 Adj deviance 
+  
+  dev.fit01 <- data.frame(pred_groups, dev.fit)
+  dev.fit01
 
 # built basic barplot if desired
-  d.max <- ceiling(signif(max(dev.fit[, 2]), 2) * 10)/10 # max of y-axis
-  ylim.r <- range(0, d.max) # range y-axis
-  x.labs <- names(tr.vip[2:v.stop]) # x-axis labels
- 
-   barplot(dev.fit[, 2], col = "darkgreen", ylim = ylim.r, main = "topo VIPs", 
-    ylab = "adj.D2", names = x.labs) # barplot
-  abline(h = 0) # add horizontal line
-  abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev 
+d.max <- ceiling(signif(max(dev.fit[, 2]), 2) * 10)/10 # max of y-axis
+ylim.r <- range(0, d.max) # range y-axis
+x.labs <- names(tr.vip[2:v.stop]) # x-axis labels
+
+ barplot(dev.fit[, 2], col = "darkgreen", ylim = ylim.r, main = "all VIPs",
+  ylab = "adj.D2", names = x.labs, las=2) # barplot - las=2 rotates labels
+abline(h = 0) # add horizontal line
+abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev
 ```
-The most important topo variable is rough_1k. 
 
-```{r}
-# estimate VIP values => AIC & Adj deviance
-  tr.vip <- as.data.frame(pied.trTOPO[,c(2, 16:19)]) # keep only P/A & predictors - had to make this a df to get GLM to work
-  pres <- 1 # column for presence:absence
-  v.start <- 2 # column start predictor variables
-  v.stop <- ncol(tr.vip) # last column predictor variables
-  v.num <- v.stop - 1 # number predictor variables
-  dev.fit <- varimp.glm(tr.vip, tr.vip, pres, v.start, v.stop) # call VIP function
-  dev.fit # output matrix; col=1 AIC, col=2 Adj deviance 
-
-# built basic barplot if desired
-  d.max <- ceiling(signif(max(dev.fit[, 2]), 2) * 10)/10 # max of y-axis
-  ylim.r <- range(0, d.max) # range y-axis
-  x.labs <- names(tr.vip[2:v.stop]) # x-axis labels
- 
-   barplot(dev.fit[, 2], col = "darkgreen", ylim = ylim.r, main = "temp VIPs", 
-    ylab = "adj.D2", names = x.labs) # barplot
-  abline(h = 0) # add horizontal line
-  abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev 
-```
-Most important temp variable is tmax_s_hal. Will work to select just this one since they're all correlated. 
-
-```{r}
-# estimate VIP values => AIC & Adj deviance
-  tr.vip <- as.data.frame(pied.trTOPO[,c(2,5:7,13:14,11)]) # keep only P/A & predictors - had to make this a df to get GLM to work
-  pres <- 1 # column for presence:absence
-  v.start <- 2 # column start predictor variables
-  v.stop <- ncol(tr.vip) # last column predictor variables
-  v.num <- v.stop - 1 # number predictor variables
-  dev.fit <- varimp.glm(tr.vip, tr.vip, pres, v.start, v.stop) # call VIP function
-  dev.fit # output matrix; col=1 AIC, col=2 Adj deviance 
-
-# built basic barplot if desired
-  d.max <- ceiling(signif(max(dev.fit[, 2]), 2) * 10)/10 # max of y-axis
-  ylim.r <- range(0, d.max) # range y-axis
-  x.labs <- names(tr.vip[2:v.stop]) # x-axis labels
- 
-   barplot(dev.fit[, 2], col = "darkgreen", ylim = ylim.r, main = "precip VIPs", 
-    ylab = "adj.D2", names = x.labs) # barplot
-  abline(h = 0) # add horizontal line
-  abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev 
-```
-Most important are eptp_5, etpt_6, adn mind_yr_av. 
 
 ---
 
@@ -240,17 +215,23 @@ Most important are eptp_5, etpt_6, adn mind_yr_av.
 * Justify your decision(s) to keep / remove variables using bullets
 
 ```{r}
-pied.tr_MORT <- pied.trTOPO %>% 
-  select(FNETID, SPPRES106, tr.wgs_x, tr.wgs_y, prad_sw_di.img, rough_1k.img, tmax_s_hal.img, tave_s_hal.img, etpt_6.img, prec_w_hal.img, mind_yr_av.img)
+remove <- c("etpt_6", "etpt_sprin", "prec_winte", "tave_s_hal", "tave_sprin", "tmax_summe", "exp1nrm", "exp3nrm", "exp5nrm")
+
+tr_RANG <-  select(rang.trTOPO, !one_of(remove))
 ```
 
-* prad sw di: average significance for the topo group, but uncorrelated to rough 1K, so I'm comfortable including it. 
-* rough 1k: By far most significant VIP for the topo group. 
-* tmax s hal: maximum temperature for April-September addresses hottest season of the year. All temperature vars had a similar importance, and all were strongly correlated, so I will select just one of them from this suite. 
-* tave_s_hal: correlated to tmax, but I'd assume that this is average temp over the growing season, so I'll include it to hit requirement of a couple vars per category. Or, could say that this is from expert opinion. 
-* etpt 6: all 3 evapotranspiration variables were highly correlated, but this one had highest VIP factor. 
-* prec w half: higher VIP than precip winter, and highly correlated, so I'll choose this one. 
-* mind_yr_av: highly correlated to etpt vars, and a moisture index that is likely modeled, so this is my reluctant 7th choice for variables list. Has a high VIP though. 
+<!-- * prad sw di: average significance for the topo group, but uncorrelated to rough 1K, so I'm comfortable including it.  -->
+<!-- * rough 1k: By far most significant VIP for the topo group.  -->
+
+<!-- * tmax s hal: maximum temperature for April-September addresses hottest season of the year. All temperature vars had a similar importance, and all were strongly correlated, so I will select just one of them from this suite.  -->
+<!-- * tave_s_hal: correlated to tmax, but I'd assume that this is average temp over the growing season, so I'll include it to hit requirement of a couple vars per category. Or, could say that this is from expert opinion.  -->
+
+<!-- * etpt 6: all 3 evapotranspiration variables were highly correlated, but this one had highest VIP factor.  -->
+<!-- * prec w half: higher VIP than precip winter, and highly correlated, so I'll choose this one.  -->
+
+<!-- * mind_yr_av: highly correlated to etpt vars, and a moisture index that is likely modeled, so this is my reluctant 7th choice for variables list. Has a high VIP though.  -->
+
+--> This has been updated: see Matt's code for our group's rationale (I'd used wrong input data). 
 ---
 
 ## Question #5
@@ -267,11 +248,11 @@ These data will be used as we next begin the SDHM model constructions.
 ```{r}
 # write out data files if desired
   setwd(path.mod2)
-  write.csv(pied.tr_MORT, file = "pied.tr_MORT.csv", row.names = F) # save .csv - training data
-  # save(pied.tr_MORT, file = "pied.tr_MORT.RData") # save .RData - pres/abs plus stacked raster
-  save(pied.tr_MORT, file = "pied.tr_MORT.RData") # save .RData - stacked raster
-  st_write(pied.tr_MORT, dsn = ".", layer = "pied.tr_MORT", driver = "ESRI Shapefile",
-    delete_layer = T, delete_dsn = T)#point shapefile in ESRI format
+  write.csv(tr_RANG, file = "tr_RANG.csv", row.names = F) # save .csv - training data
+  save(tr_RANG, file = "tr_RANG.RData") # save .RData - pres/abs plus stacked raster
+  save(tr_RANG, file = "tr_RANG.RData") # save .RData - stacked raster
+  st_write(tr_RANG, dsn = ".", layer = "tr_RANG", driver = "ESRI Shapefile",
+    delete_layer = T, delete_dsn = T) #point shapefile in ESRI format
 ```
 
 
