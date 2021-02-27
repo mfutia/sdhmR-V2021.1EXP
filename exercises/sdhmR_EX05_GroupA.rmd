@@ -35,20 +35,19 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 
 #add proj string for WGS 84
 prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
-
   
 #load presence/absence data 
   # setwd(path.mod2) - not working?
-  pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.PPsA.RData")) 
+  pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rang.PPsA.RData")) 
   # load presence:absence data
   head(pres.abs, 2) # examine
 ```
   
 ```{r}
-  load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.framesR.RData") 
-
-  pied.bufptR # examine cropping raster
-  plot(pied.bufptR) # examine raster plot
+  # load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.framesR.RData") 
+  # 
+  # pied.bufptR # examine cropping raster
+  # plot(pied.bufptR) # examine raster plot --> don't really need
 ```
 
 
@@ -69,7 +68,8 @@ prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
 * Import the predictor GIS variables into R
 
 ```{r, message=FALSE}
-#run this entire chunk at one time
+#run this entire chunk at one time!!
+
  setwd("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/preds")
 img.list <- list.files(pattern = ".img$") # list of .img files; $ strips extra
 img.list # examine
@@ -77,7 +77,8 @@ img.list # examine
 # loop for extracting topo data w/raster stack
   layers <- {} # initialize (empty) list of raster layers
   for (i in 1:length(img.list)) {
-    r1 <- crop(raster(img.list[i]), pied.bufptR) # crop pred var raster to buffer raster
+    # r1 <- crop(raster(img.list[i]), pied.bufptR) # crop pred var raster to buffer raster --> can skip this
+    r1 <- raster(img.list[i])
     names(r1) <- strsplit(img.list[i], "_wgs.img") # assign name to raster
    layers <- c(layers, r1) # add raster to layer of rasters
   }
@@ -110,16 +111,17 @@ Looks good: all 16 rasters are there, and resolution/CRS are preserved.
 * Create a new dataframe by binding the extracted predictor variable values to the dataframe from exercise #4.
 
 ```{r}
-  pied.trTOPO <- cbind(pres.abs, t1) %>% # bind to train dataframe
-    select(-c(wgs_xF, wgs_yF, cell.wgs_x, cell.wgs_y))
+  rang.trTOPO <- cbind(pres.abs, t1) %>% # bind to train dataframe
+    select(-c(wgs_xF, wgs_yF, x, y))
 
-  head(pied.trTOPO, 2) # examine training data frame
+  head(rang.trTOPO, 2) # examine training data frame
+  
 ```
 
 I removed the wgs_xF and cell.wgs_x columns, since all coords are in tr.wgs_x. 
 
 ```{r}
-ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
+ggplot(rang.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
   geom_point(aes(color=prec_winte.img)) +
   theme_classic()
 ```
@@ -127,7 +129,7 @@ ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
 A plot for fun, winter precipitation. Looks reasonable. 
 
 ```{r}
-ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
+ggplot(rang.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
   geom_point(aes(color=rough_1k.img)) +
   theme_classic()
 ```
@@ -135,8 +137,8 @@ ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
 Assuming this is some kind of elevation layer? Looks like some of these predictors will be correlated. 
 
 ```{r}
-ggplot(pied.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
-  geom_point(aes(color=factor(SPPRES106))) +
+ggplot(rang.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
+  geom_point(aes(color=factor(RANG106))) +
   theme_classic()
 ```
 Based on these maps, this species prefers higher-elevation sites. 
@@ -157,11 +159,11 @@ These data will be used in the next exercise #6.
 
 # write out data files if desired
   setwd(path.mod2)
-  write.csv(pied.trTOPO, file = "pied_trTOPO.csv", row.names = F) # save .csv - training data
-  save(pied.trTOPO, file = "pied.trTOPO.RData") # save .RData - pres/abs plus stacked raster
+  write.csv(rang.trTOPO, file = "rang.trTOPO.csv", row.names = F) # save .csv - training data
+  save(rang.trTOPO, file = "rang.trTOPO.RData") # save .RData - pres/abs plus stacked raster
   save(pied.topoDOM, file = "pied.topoDOM.RData") # save .RData - stacked raster
-  st_write(pied.trTOPO, dsn = ".", layer = "pied.trTOPO", driver = "ESRI Shapefile",
-    delete_layer = T, delete_dsn = T)#point shapefile in ESRI format
+  st_write(rang.trTOPO, dsn = ".", layer = "rang.trTOPO", driver = "ESRI Shapefile",
+    delete_layer = T, delete_dsn = T) #point shapefile in ESRI format
 ```
 
 ---
