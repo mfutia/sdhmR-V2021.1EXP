@@ -1,0 +1,154 @@
+---
+title: "Explore the Training Dataset"
+author: "Eli L. Polzer"
+date: "28 February 2021"
+output: html_document
+---
+
+## The Data
+
+* The dataframe completed in exercise #5.
+
+---
+
+## Question #1
+
+* Break the predictor variables into logical groups of **topography**, **temperature**, and **precipitation**.  Do this by creating a new column called **`pred_type`** and add it the dataframe.
+
+```{r}
+path.root <- "C:/Users/epolzer/Documents/sdhmR-V2021.1"
+path.dat <- paste(path.root, "/sdhmR-V2021.1EXP/Data/exercise/traindat", sep = "")
+path.mod2 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module02", sep = "")
+path.gis <- paste(path.root, "/sdhmR-V2021.1EXP/Data/gis_layers", sep = "")
+path.figs <- paste(path.root, "/sdhmR-V2021.1EXP/Figures", sep = "")
+path.prj <- paste(path.root, "/sdhmR-V2021.1EXP/R_Code", sep = "")
+
+library(modeest)
+library(tidyverse) 
+library(data.table)
+library(sf)
+
+## Load data:
+setwd(path.mod2)
+range.tr <- get(load("range.train.RData "))
+dim(range.tr)
+head(range.tr [c(1:2, 7:24)], 2)
+
+## Group data:
+pred_groups <- data.frame(names(range.tr[,9:24]))
+names(pred_groups) <- "PredVariable"
+topo <- c("exp1nrm.img","exp3nrm.img","exp5nrm.img","prad_sw_di.img","rough_1k.img","topos.img")
+temp <- c("tave_s_hal.img","tave_sprin.img","tmax_s_hal.img","tmax_summe.img")
+moisture <- c("etpt_5.img","etpt_6.img","etpt_sprin.img","mind_yr_av.img","prec_w_hal.img","prec_winte.img")
+
+pred_groups$PredType <- ifelse(pred_groups$PredVariable %in% topo,"Topography",
+                               ifelse(pred_groups$PredVariable %in% temp,"Temperature", "Moisture"))
+```
+
+---
+
+## Question #2
+
+* Assess correlations:
+  * Among all variables; and
+  * Within each of the logical groupings created above
+```{r}
+## Assess correlations of all individual variables:
+cut.point <- 0.7
+c1 <- cor(range.tr [, c(9:24)], use = "pairwise.complete.obs", method = "spearman") 
+c1 
+
+c2 <- subset(c1 > cut.point | c1 < cut.point )
+c2 
+
+## Assess correlations of grouped variables:
+c3 <- cor(dplyr::select(range.tr, one_of(topo)), use = "pairwise.complete.obs", method = "spearman")
+c_topo <- subset(c3 > cut.point | c3 < -cut.point)
+c_topo
+
+c4 <- cor(dplyr::select(range.tr, one_of(temp)), use = "pairwise.complete.obs", method = "spearman")
+c_temp <- subset(c4 > cut.point | c4 < -cut.point)
+c_temp
+
+c5 <- cor(dplyr::select(range.tr, one_of(moisture)), use = "pairwise.complete.obs", method = "spearman")
+c_moisture <- subset(c5 > cut.point | c5 < -cut.point)
+c_moisture
+```
+
+---
+
+## Question #3
+
+* Examine variable importance of each predictor variable as related to presence:absence using the process described in the Module.
+```{r}
+varimp.glm <- function(tr.spp, tr.var, pres, pf, pl) {
+  tmp.mat <- matrix(ncol = 2, nrow = (pl - pf + 1))
+  for (i in pf:pl) {
+    tmp <- glm(tr.spp[, pres] ~ tr.var[, i] + I((tr.var[, i])^2), na.action = na.omit,
+               family = binomial)
+    tmp.mat[(i - pf + 1), 1] <- tmp$aic
+    tmp.mat[(i - pf + 1), 2] <- (1 - (tmp$deviance/tmp$null.deviance))
+  }
+  return(tmp.mat)
+} 
+
+tr.vip <- range.tr[, c(2, 9:24)] 
+pres <- 1 
+v.start <- 2 
+v.stop <- ncol(tr.vip) 
+v.num <- v.stop - 1 
+dev.fit <- varimp.glm(tr.vip, tr.vip, pres, v.start, v.stop) 
+dev.fit <- data.frame(pred_groups, dev.fit) 
+setnames(dev.fit, c("X1", "X2"), c("AIC", "AdjDeviance"))
+dev.fit1 <- dev.fit[order(dev.fit$PredType),]
+dev.fit$PredVariable <- factor(dev.fit$PredVariable, 
+                           levels = dev.fit$Variable[order(dev.fit$PredType)])
+dev.fit1
+```
+
+---
+
+## Question #4
+
+* Eliminate redundant variables with a goal of retaining 7-10 of the 16 available
+* Justify your decision(s) to keep / remove variables using bullets
+```{r}
+remove = c("etpt_6.img", "etpt_sprin.img", "prec_winte.img", "exp3nrm.img", "exp5nrm.img", "topos.img", "tave_s_hal.img", "tave_sprin.img", "tmax_summe.img")
+range.tr.final <- (select(range.tr, !one_of(remove)))
+
+#exp3nrm: high correlation with both exp1nrm and exp5nrm plus low AdjDev
+#exp5nrm: high correlation with both exp1nrm and exp3nrm plus low AdjDev
+#topos: somewhat high correlation withexp3nrm and exp5nrm and very low AdjDev (choice between this var and exp1nrm, which were very close)
+#etpt6: high correlation with etpt5 and mind_yr_av and low AdjDev (choice between this var and etpt 5, which were very similar)
+#etpt_sprin: high correlation with etpt5, etpt6, and mind_yr_av plus low AdjDev
+#prec_wint: high correlation with prec_w_hal plus very low AdjDev
+#tave_s_hal: high correlation with all vars plus lowest AdjDev of Temp var
+#tave_sprin: high correlation with all vars plus 2nd lowest AdjDev of Temp var
+#tmax_summe: high correlation with all vars plus 3rd lowest AdjDev of Temp var
+```
+
+---
+
+## Question #5
+
+* Include the term **tr_MORT**, **tr_PERS**, **tr_RANG**, and **tr_SEED** somewhere in the final training data objects, depending on your data group.  Use of **tr_ByGroup** here means the data are now ready for model creation.
+* Save your data as R objects:
+  * Dataframe;
+  * Point shapefile with geometry in R
+  * Export as a point shapefile in ESRI format
+* Save these R objects in a **`.RData`** file
+
+These data will be used as we next begin the SDHM model constructions.
+```{r}
+setwd(path.mod2)
+write.csv(range.tr.final, file = "tr_RANG.FINAL.csv", row.names = F) # save .csv - training data
+save(range.tr.final, file = "tr_RANG.FINAL.RData") # save .RData - pres/abs plus stacked raster
+st_write(range.tr.final, dsn = ".", layer = "tr_RANG.FINAL", driver = "ESRI Shapefile",
+         delete_layer = T, delete_dsn = T) #point shapefile in ESRI format
+```
+
+---
+
+## The End
+
+---
