@@ -40,14 +40,14 @@ prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
   # setwd(path.mod2) - not working?
   pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rang.PPsA.RData")) 
   # load presence:absence data
-  head(pres.abs, 2) # examine
+  head(pres.abs, 2) # examine -- the coordinates w/ no NAs are the tr.wgs_x 
 ```
   
 ```{r}
-  # load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.framesR.RData") 
+  load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.framesR.RData")
   # 
-  # pied.bufptR # examine cropping raster
-  # plot(pied.bufptR) # examine raster plot --> don't really need
+  rang.bufR # examine cropping raster
+  plot(rang.bufR) 
 ```
 
 
@@ -71,21 +71,40 @@ prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
 #run this entire chunk at one time!!
 
  setwd("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/preds")
-img.list <- list.files(pattern = ".img$") # list of .img files; $ strips extra
-img.list # examine
 
-# loop for extracting topo data w/raster stack
-  layers <- {} # initialize (empty) list of raster layers
-  for (i in 1:length(img.list)) {
-    # r1 <- crop(raster(img.list[i]), pied.bufptR) # crop pred var raster to buffer raster --> can skip this
-    r1 <- raster(img.list[i])
-    names(r1) <- strsplit(img.list[i], "_wgs.img") # assign name to raster
-   layers <- c(layers, r1) # add raster to layer of rasters
-  }
-  layers # examine raster stack; return is a list of raster layers
+# img.list <- list.files(pattern = ".img$") # list of .img files; $ strips extra
+# img.list # examine
+
+# # loop for extracting topo data w/raster stack
+#   layers <- {} # initialize (empty) list of raster layers
+#   for (i in 1:length(img.list)) {
+#     r1 <- crop(raster(img.list[i]), rang.bufR) # crop pred var raster to buffer raster --> can skip this
+#     r1 <- raster(img.list[i])
+#     names(r1) <- strsplit(img.list[i], ".img") # assign name to raster - not working
+#    layers <- c(layers, r1) # add raster to layer of rasters
+#   }
+#   layers # examine raster stack; return is a list of raster layers
+
+# Individual import:
+etpt5 <- raster("etpt_5.img")
+etpt6 <- raster("etpt_6.img")
+etptsprin <- raster("etpt_sprin.img") 
+exp1nrm <- raster("exp1nrm.img") 
+exp3nrm <- raster("exp3nrm.img") 
+exp5nrm <- raster("exp5nrm.img")
+mindyrav <- raster("mind_yr_av.img")
+pradswdi <- raster("prad_sw_di.img") 
+precwhal <- raster("prec_w_hal.img") 
+precwinte <- raster("prec_winte.img") 
+taveshal <- raster("tave_s_hal.img") 
+tavesprin <- raster("tave_sprin.img") 
+tmaxshal <- raster("tmax_s_hal.img") 
+tmaxsumme <- raster("tmax_summe.img") 
+rough1k <- raster("rough_1k.img") 
+topos <- raster("topos.img") 
 ```
 
-It looks like all CRS's of rasters are WGS84, so I won't have to re-project. Also all resolutions are the same, 0.0083 x 0.0083. 
+It looks like all CRS's of rasters are WGS84, so I won't have to re-project. Also all resolutions are the same, 0.0083 x 0.0083. n = 16
 
 ---
 
@@ -94,15 +113,20 @@ It looks like all CRS's of rasters are WGS84, so I won't have to re-project. Als
 * Extract predictor variables from all 16 **`.img`** files using the presence:absence [X,Y]'s
 
 ```{r}
-# build the raster stack
-  pied.topoDOM <- stack(layers) # create a raster stack
-  pied.topoDOM # examine stack
 
+layers <- c(etpt5, etpt6, etptsprin, exp1nrm, exp3nrm, exp5nrm, mindyrav, pradswdi, precwhal, precwinte, taveshal, 
+tavesprin, tmaxshal, tmaxsumme, rough, topos)
+
+# build the raster stack
+  pied.topoRANG_stack <- stack(etpt5, etpt6, etptsprin, exp1nrm, exp3nrm, exp5nrm, mindyrav, pradswdi, precwhal, precwinte, taveshal, tavesprin, tmaxshal, tmaxsumme, rough, topos) # create a raster stack
+  pied.topoRANG_stack # examine stack
+  
 # extract from stack 
-  t1 <- extract(pied.topoDOM, pres.abs[, c("tr.wgs_x", "tr.wgs_y")]) # extract values from raster stack
-  head(t1, 2) # examine extracted matrix
+  t1_RANG <- extract(pied.topoRANG_stack, pres.abs[, c("tr.wgs_x", "tr.wgs_y")]) # extract values from raster stack
+  head(t1_RANG, 2) # examine extracted matrix 
+  
 ```
-Looks good: all 16 rasters are there, and resolution/CRS are preserved. 
+This is causing issues-- there are NAs in predictors bc it's not punching out correctly.  
 
 ---
 
@@ -111,7 +135,7 @@ Looks good: all 16 rasters are there, and resolution/CRS are preserved.
 * Create a new dataframe by binding the extracted predictor variable values to the dataframe from exercise #4.
 
 ```{r}
-  rang.trTOPO <- cbind(pres.abs, t1) %>% # bind to train dataframe
+  rang.trTOPO <- cbind(pres.abs, t1_RANG) %>% # bind to train dataframe
     select(-c(wgs_xF, wgs_yF, x, y))
 
   head(rang.trTOPO, 2) # examine training data frame
@@ -160,7 +184,7 @@ These data will be used in the next exercise #6.
 # write out data files if desired
   setwd(path.mod2)
   write.csv(rang.trTOPO, file = "rang.trTOPO.csv", row.names = F) # save .csv - training data
-  save(rang.trTOPO, file = "rang.trTOPO.RData") # save .RData - pres/abs plus stacked raster
+  save(rang.trTOPO, file = "rang.trTOPO.RData") # save .RData - pres/abs plus stacked raster 
   save(pied.topoDOM, file = "pied.topoDOM.RData") # save .RData - stacked raster
   st_write(rang.trTOPO, dsn = ".", layer = "rang.trTOPO", driver = "ESRI Shapefile",
     delete_layer = T, delete_dsn = T) #point shapefile in ESRI format
