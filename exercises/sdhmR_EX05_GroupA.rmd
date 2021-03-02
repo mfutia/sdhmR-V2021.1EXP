@@ -3,6 +3,8 @@ title: "Exercise 5: Building the Training Dataframe"
 author: "Group A: Eli Polzer, Matt Futia, Mia McReynolds"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r global_options, include=FALSE}
@@ -22,44 +24,22 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 
 # some libraries
   library(raster)	# FXNS:	raster, projection, projectRaster, extract, crop
-  library(readr)
+  # library(readr)
   library(ggplot2)
-  library(dplyr)
+  # library(dplyr)
    library(sf)    
-```
-
-
-```{r, message=FALSE}
-#import range-wide data
-  spp106pr_RANG <- read_csv("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/traindat/spp106pr_RANG.csv")
-
-#add proj string for WGS 84
+  
+  #add proj string for WGS 84
 prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
-  
-#load presence/absence data 
-  # setwd(path.mod2) - not working?
-  pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rang.PPsA.RData")) 
-  # load presence:absence data
-  head(pres.abs, 2) # examine -- the coordinates w/ no NAs are the tr.wgs_x 
 ```
-  
+
+
 ```{r}
-  load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.framesR.RData")
-  # 
-  rang.bufR # examine cropping raster
-  plot(rang.bufR) 
+#load presence/absence data 
+  pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.PPsA_range.RData")) 
+  head(pres.abs, 2) 
 ```
-
-
-## The Data
-
-* Common piñon *Pinus edulis* sppcode=106
-* The pseudo-absence data: Wherever stored from Homework #4
-* Predictors: **`~\sdhmR-V2020.2\data\exercise\preds`** 
-  * There are a total of 16 predictor variables the directory above
-  * The variables are **`.img`** files
-* Data files:
-  * **`spp106pr_MORT.csv`**, **`spp106pr_PERS.csv`**, **`spp106pr_RANG.csv`**, **`spp106pr_SEED.csv`**
+  
 
 ---
 
@@ -67,7 +47,27 @@ prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
 
 * Import the predictor GIS variables into R
 
-```{r, message=FALSE}
+```{r}
+# Import predictor GIS variables
+setwd(path.root)
+
+rastlist <- list.files(path = "data/exercise/preds", pattern='.img$', 
+all.files=TRUE, full.names=FALSE)
+
+# buffer = rang.bufR
+
+setwd("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/preds")
+layers <- {}
+for (i in 1:length(rastlist)) {
+  r1 <- raster(rastlist[i])
+  names(r1) <- strsplit(rastlist[i], "_wgs.img")
+  layers <- c(layers, r1)
+}
+layers
+```
+
+
+```{r, message=FALSE, eval=FALSE}
 #run this entire chunk at one time!!
 
  setwd("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/preds")
@@ -114,19 +114,21 @@ It looks like all CRS's of rasters are WGS84, so I won't have to re-project. Als
 
 ```{r}
 
-layers <- c(etpt5, etpt6, etptsprin, exp1nrm, exp3nrm, exp5nrm, mindyrav, pradswdi, precwhal, precwinte, taveshal, 
-tavesprin, tmaxshal, tmaxsumme, rough, topos)
+# layers <- c(etpt5, etpt6, etptsprin, exp1nrm, exp3nrm, exp5nrm, mindyrav, pradswdi, precwhal, precwinte, taveshal, tavesprin, tmaxshal, tmaxsumme, rough, topos)
 
 # build the raster stack
-  pied.topoRANG_stack <- stack(etpt5, etpt6, etptsprin, exp1nrm, exp3nrm, exp5nrm, mindyrav, pradswdi, precwhal, precwinte, taveshal, tavesprin, tmaxshal, tmaxsumme, rough, topos) # create a raster stack
-  pied.topoRANG_stack # examine stack
-  
-# extract from stack 
-  t1_RANG <- extract(pied.topoRANG_stack, pres.abs[, c("tr.wgs_x", "tr.wgs_y")]) # extract values from raster stack
-  head(t1_RANG, 2) # examine extracted matrix 
-  
+  rangeDOM <- stack(layers) # create a raster stack
+  rangeDOM # examine stack
 ```
-This is causing issues-- there are NAs in predictors bc it's not punching out correctly.  
+
+```{r}
+# extract from stack 
+  t1 <- raster::extract(rangeDOM, pied.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+vars <- sub(".img", "", colnames(t1))
+colnames(t1) <- vars
+head(t1, 2) 
+```
+This is causing issues-- there are NAs in predictors bc it's not punching out correctly.  Still not working, even after copying others' code and trying to re-download source files... How can this be??? 
 
 ---
 

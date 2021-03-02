@@ -297,9 +297,9 @@ st_write(pied.range.fnetSF, dsn = ".", layer = "piedrange_fnetSF", driver = "ESR
 ```{r}
 setwd(path.mod2)
 save("pied.range.fnetSF", "pied.range.fnetDF", file = "pied.range.fnet.RData")
-save(pied.indexFNET, file = "pied.indexFNET.RData")
-write.csv(pied.PPsA, file = "pied_PPsA.csv", row.names = F)
-save(pied.PPsA, file = "pied.PPsA.RData")
+save(pied.indexFNET, file = "pied.indexFNET_range.RData")
+write.csv(pied.PPsA, file = "pied_PPsA_range.csv", row.names = F)
+save(pied.PPsA, file = "pied.PPsA_range.RData")
 ```
 
 ---
