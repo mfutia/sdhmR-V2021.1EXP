@@ -7,6 +7,8 @@ editor_options:
   chunk_output_type: console
 ---
 
+Updated-- I used the code exactly from the HW 4 we turned in. 
+
 ```{r global_options, include=FALSE}
 knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
 #knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
@@ -19,6 +21,9 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
   path.mod2 <- paste(path.root, "/data/module02", sep = "")
   path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
   path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+  path.dat <- paste(path.root, "/sdhmR-V2021.1EXP/Data/exercise/traindat", sep = "")
+  
+prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
 ```
 
 ```{r}
@@ -28,9 +33,6 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
   library(sf)    	# FXNS: st_as_sf, st_as_sfc, st_bbox, st_convex_hull, st_union
 					#       st_buffer, st_read, st_write, st_intersection, st_geometry,
 					#       st_drop_geometry, st_coordinates, st_sf
-  library(terra)	# FXNS: as.data.frame, rast, vect
-  library(readr)
-  library(ggplot2)
 ```
 
 ---
@@ -43,45 +45,60 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
   * **CAUTION**:  make sure the pluses and minuses when buffering are in the correct direction given north, south, east, and west !! (Serious screw-ups happen here …)
 * Ensure you assign correct CRS, values, and resolution to bounding box
 
+
 ```{r}
-#import range-wide data
-spp106pr_RANG <- read_csv("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/traindat/spp106pr_RANG.csv")
-
-#add proj string for WGS 84
-prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
-
-pied.range <- st_as_sf(spp106pr_RANG, coords=c("wgs_xF", "wgs_yF"), crs=prj.wgs84, remove=F)
-class(pied.range)
-
-# build buffered presence bbox polygon
-#   simple rounding by 0.5 deg, creates ~50 km buffer in Utah
-  extb <- extent(min(pied.range$wgs_xF) - 0.5, max(pied.range$wgs_xF) + 0.5, 
-                 min(pied.range$wgs_yF) - 0.5, max(pied.range$wgs_yF) + 0.5)
-  
-# create .5 decideg buffered poly (replace "pid.bufSF")
-  rang.bufSF <- st_as_sfc(st_bbox(extb, crs = prj.wgs84))
-  rang.bufSF # examine - looks good
-  # plot(st_geometry(rang.bufSF), axes = T) # NOT RUN
-  
-  ggplot() +
-  geom_sf(data=rang.bufSF, fill="gray70") +
-  geom_point(data=spp106pr_RANG, aes(x=wgs_xF, y=wgs_yF), color="darkgreen") +
-  theme_classic()
+tru.range <- read.csv("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/exercise/traindat/spp106pr_RANG_2.csv")
+dim(tru.range)
 ```
 
 ```{r}
- # obtain desired resolution from existing GIS data layer in WGS84
+head(tru.range,2)
+```
+
+```{r}
+pied.range <- st_as_sf(tru.range, coords = c("wgs_xF", "wgs_yF"), 
+                      crs = prj.wgs84, remove = F) 
+head(pied.range, 2)
+```
+
+```{r}
+class(pied.range)
+```
+
+```{r}
+extb <- extent(min(tru.range$wgs_xF) - 0.5, max(tru.range$wgs_xF) + 0.5, 
+               min(tru.range$wgs_yF) - 0.5, max(tru.range$wgs_yF) + 0.5)
+pied.range.bufSF <- st_as_sfc(st_bbox(extb, crs = prj.wgs84))
+pied.range.bufSF
+```
+
+```{r}
 setwd(path.gis)
 t1 <- raster("templateR_wgs.img")
-	t1 #CRS is WGS 84
-
-# extract buffered points from template & rasterize
-  rang.bufSP <- as_Spatial(rang.bufSF) # convert to sp spatialpolygon class
-  rang.bufR <- crop(rasterize(rang.bufSP, t1), rang.bufSP) # t1 is template from above
-  rang.bufR # examine
-
-   #how do you plot a raster in ggplot?
 ```
+
+```{r}
+t1
+```
+
+```{r}
+pied.range.bufSP <- as_Spatial(pied.range.bufSF) 
+pied.range.bufR <- crop(rasterize(pied.range.bufSP, t1), pied.range.bufSP)
+pied.range.bufR
+```
+
+```{r}
+# plot(t1, legend = F, col = "grey90")
+# plot(pied.range.bufR, add = T, col = "grey30", legend = F)
+# plot(pied.range.bufSF, add = T, border = "darkgreen", lwd = 2)
+```
+
+```{r}
+plot(pied.range.bufSF, col = "gray90", axes = T, 
+     main = "Buffered bounding box on presence points")
+points(tru.range$wgs_xF, tru.range$wgs_yF, pch = 20, col = "darkgreen")  
+```
+
 
 ---
 
@@ -89,38 +106,46 @@ t1 <- raster("templateR_wgs.img")
 
 * Build a fishnet for the bounding box
 ```{r}
-
-# extract coords, cell id of coords, & build dataframe
-  f1 <- sp::coordinates(rang.bufR) # get spatial coords from rang.bufR
-  f2 <- cellFromXY(rang.bufR, f1) # extract cell number from buffered extent
-  f3 <- as.data.frame(cbind(f1, f2)) # build datframe of x,y & cell number
-  head(f3, 2) # examine
-  tail(f3, 1) # f2 value should eq. ncell in rang.bufR; below
-  ncell(rang.bufR) # should eq. f2 value above
-# some dataframe clean-up
-  names(f3)[1:3] <- c("cell.wgs_x", "cell.wgs_y", "FNETID") # assign names
-  f3 <- f3[c("FNETID", "cell.wgs_x", "cell.wgs_y")] # reorder
-
-# examine fishnet data structure
-  dim(f3) # dimension; rows is maximum number of cells in fishnet 
-  names(f3) # names in fishnet
-  head(f3, 2) # note first FNETID number
-  tail(f3, 2) # note last FNETID number matches dimension size
-
-# convert dataframe to spatial object
-  rang.fnetSF <- st_as_sf(f3, coords = c("cell.wgs_x", "cell.wgs_y"), 
-    crs = prj.wgs84, remove = F) # remove=F retains input x,y)
-  head(rang.fnetSF, 2) # examine
-
-# build stand-alone dataframe from geospatial object
-  class(rang.fnetSF) # note dataframe class; will extract data.frame
-  rang.fnetDF <- st_drop_geometry(rang.fnetSF) # build dataframe
-  head(rang.fnetDF, 2) # examine
-  class(rang.fnetDF) # check if class=data.frame -> yes
+f1 <- sp::coordinates(pied.range.bufR) 
+f2 <- cellFromXY(pied.range.bufR, f1) 
+f3 <- as.data.frame(cbind(f1, f2)) 
+head(f3, 2) 
 ```
 
+```{r}
+tail(f3, 2) 
+```
 
-The dimensions check out, and I think the CRS is successfully set to WGS84. 
+```{r}
+ncell(pied.range.bufR)
+```
+
+```{r}
+names(f3)[1:3] <- c("cell.wgs_x", "cell.wgs_y", "FNETID")
+f3 <- f3[c("FNETID", "cell.wgs_x", "cell.wgs_y")] 
+
+pied.range.fnetSF <- st_as_sf(f3, coords = c("cell.wgs_x", "cell.wgs_y"), 
+                           crs = prj.wgs84, remove = F) 
+head(pied.range.fnetSF, 2)
+```
+
+```{r}
+class(pied.range.fnetSF) 
+```
+
+```{r}
+pied.range.fnetDF <- st_drop_geometry(pied.range.fnetSF)
+head(pied.range.fnetDF, 2)
+```
+
+```{r}
+tail(pied.range.fnetDF, 2)
+```
+
+```{r}
+class(pied.range.fnetDF)
+```
+
 
 ---
 
@@ -129,148 +154,119 @@ The dimensions check out, and I think the CRS is successfully set to WGS84.
 * Use the fishnet to create a pseudo--absence data frame of [X,Y]’s
 * For simplicity’s sake, set $n$ for pseudo--absence at twice (2$\times$) the number of presences in your respective RANG, PERS, MORT, and SEED data set
 * Bind these data to the presence dataframe you imported in Question #1 (spp106pr_RANG)
-
-```{r link species to fishnet - m02.04}
-# convert species x,y to spatial coordinate; tru.pres from above
-  tru.xy <- spp106pr_RANG[c("wgs_xF", "wgs_yF")]  # get x,y of species presences
-  p1 <- sp::coordinates(tru.xy) # set spatial coords from rang.bufR
-
-# extract FNETID of presence from different modelling frames
-  pres.fnetid <- cellFromXY(rang.bufR, p1) # FNETID of presence from pt-buffered poly
-  head(pres.fnetid) # FNETID numbers associated with species x,y
-
-# some internal checking
-  length(pres.fnetid) # should match number of presences ??
-  length(spp106pr_RANG$UNIQUEID) # it does ... 1999
-
-# create species dataframe with FNETIDs
-  tru.rangFNET <- cbind(pres.fnetid, tru.xy, spp106pr_RANG[4]) # add fishnet ID to tru.pres
-  names(tru.rangFNET)[1] <- "FNETID" # name change 
-  head(tru.rangFNET, 2) # examine
-
-# giggle plots
-  plot(rang.bufR, col = "gray70", legend = F, main = "Points in modelling frame")  # main plot
-  points(tru.xy$wgs_xF, tru.xy$wgs_yF, pch = 20, col = "darkgreen") # add spp locations
-```
-
-```{r LINK MODELLING FRAMES TO FISHNET}
-
-# extract FNETID of modelling frame; many different frames can be used
-  bufpt.fnetid <- raster::extract(rang.bufR, rang.fnetDF[c("cell.wgs_x", "cell.wgs_y")])
-   bufpt.fnetid[1:6] # examine: all are 1 because this fishnet is as large as modelling frame?
-
-# create modelling dataframe with FNETIDs
-  tru.bufFNET <- cbind(rang.fnetDF, bufpt.fnetid) # bind modelling frame w/FISHNET
-  head(tru.bufFNET, 2) # examine
-  
-# some internal checking
-  length(tru.bufFNET$bufpt.fnetid) # number FNETIDs in tru.bufFNET
-  ncell(rang.bufR) # should equal above
-  table(tru.bufFNET$bufpt.fnetid)[[1]] # number of FNETIDs in rang.bufR
-  length(which(is.na(tru.bufFNET$bufpt.fnetid))) # No. NAs -- This all checks out
-```
-
-
 ```{r}
-# START MERGE SPP LOCATION, MODELLING FRAME, ALL BY FISHNET ID'S 
-
-# examine dataframes
-  head(rang.fnetDF, 2) # fishnet dataframe
-  dim(rang.fnetDF)[1] # size of fishnet dataframe
-  head(tru.bufFNET, 2) # modelling dataframe
-  table(tru.bufFNET$bufpt.fnetid)[[1]] # number of FNETIDs in rang.bufR
-  head(rang.fnetDF, 2) # spp locations dataframe
-  dim(spp106pr_RANG)[1] # number spp locations - these will be removed before making pseudo-abs
-
-# begin merge: NOTE merge by=c("sort vars") & all.y=T options
-  m1 <- merge(rang.fnetDF, tru.bufFNET, by = c("FNETID", "cell.wgs_x", "cell.wgs_y"), all.y = T)
-  head(m1, 2) # examine: FNETID no longer ranked but not to worry ...
-  rang.indexFNET <- merge(m1, tru.rangFNET, by = "FNETID", all = T) # final merge:assign DF name 
-  head(rang.indexFNET, 2) # final merge: FNETID now ranked
-  names(rang.indexFNET)[4] <- "in.modFR" # change some names
-  names(rang.indexFNET) # examine names
-
-  #rename ?... 
-  # rang.indexFNET$FNETID <- rang.indexFNET$f2
-
-  # internal checking
-  length(rang.indexFNET$FNETID) # does it match w/above ?? 
-  length(rang.indexFNET$f2) # 0 ?
-  table(rang.indexFNET$in.modFR)[[1]] # does it match w/above ?? yes !
-  # table(rang.indexFNET$SPPRES106)[[1]] # does it match w/above ?? 
-  names(rang.indexFNET) # names make sense ?? yes !
-  
-# outfile final fnet index dataframe
-  setwd(path.mod2)
-  save(rang.indexFNET, file = "rang.indexFNET.RData")
-  
-# examine the fishnet
-  head(rang.indexFNET)
-
+setwd(path.mod2)
+load("pied.framesR.RData")
+pied.range.bufR
 ```
 
 ```{r}
-# START EXTRACT PSEUDO-ABSENCES [X,Y]'s
-
-# import data; re-load if not in workspace
-  setwd(path.mod2)  # path to data
-    p1 <- get(load("rang.indexFNET.RData")) # load data
-  head(p1, 2) # examine
+setwd(path.mod2)
+load("pied.framesSF.RData")
+pied.range.bufSF
 ```
 
 ```{r}
-# create conditional vectors: FNETIDs by spp locations & in modelling frame
-  p2.spp <- subset(p1$FNETID, p1$RANG106 == 1) # FNETIDs of spp locations
-  p2.modFR <- subset(p1$FNETID, p1$in.modFR == 1) # FNETIDs in modelling frame
-  length(p2.spp) # should equal N of spp locations
-  length(p2.modFR) # should equal N modelling frame
-
-# drop presence cell FNETIDs; remaining are possible psuedo-abs cell FNETIDs
-  p3 <- p1[!p1$FNETID %in% p2.spp, ] # background from fishnet
-  p4 <- p1[!p1$FNETID %in% p2.spp & p1$FNETID %in% p2.modFR, ] # background from modelling frame
-  psu.bufpt <- p4 # new name to dataframe: this dataframe used from now on
-
-# internal checking
-  length(p1$FNETID) # N of FISHNET
-  dim(p3)[1] # N of FISHNET - N spp locations
-  table(p1$RANG106)[[1]] # N spp locations
-  dim(p3)[1] + table(p1$RANG106)[[1]] # should equal N of FISHNET
-  length(p2.modFR) # N of modelling frame
-  dim(p4)[1] # N modelling frame - N spp locations
-  dim(p4)[1] + table(p1$RANG106)[[1]] # should equal N modelling frame
-
-# recall ...
-  table(p1$RANG106)[[1]] # N of spp locations
-  head(psu.bufpt, 2) # dataframe from which samples drawn
-
-# start the draws; multiple options shown below
-  # N=2*No. pres
-set.seed(1234) # set seed to ensure repeatability
-psu.srs2 <- psu.bufpt[sample(1:nrow(psu.bufpt), 2 * table(p1$RANG106)[[1]], replace = F), ]
-psu.srs2$RANG106 <- 0  # assign 0 to psu.abs
-psu.srs2$in.modFR <- 1  # assign 1 to in.modFR
-head(psu.srs2,2)
+load("pied.range.fnet.RData")
+head(pied.range.fnetDF , 2)
 ```
 
 ```{r}
-#START MERGE PSEUDO-ABS WITH TRUE PRESENCE DATAFRAME  
+head(pied.range.fnetSF , 2)
+```
 
-# merge with true presences for predictor extraction
-  head(tru.rangFNET, 2)
-  head(psu.srs2, 2) # examine; both MUST have FNETID 
-  rang.PPsA <- merge(tru.rangFNET, psu.srs2, by = c("FNETID", "RANG106", "wgs_xF", "wgs_yF"), 
-    all = T) # merge
-  rang.PPsA$in.modFR <- NULL # drop in.modFR index no longer needed
-  dim(rang.PPsA) # examine
-  head(rang.PPsA, 2) # dim => No. pres + No. psu.abs
+```{r}
+tru.xy <- tru.range[c("wgs_xF", "wgs_yF")]
+pX <- sp::coordinates(tru.xy) 
+pres.fnetid <- cellFromXY(pied.range.bufR, pX)
+tru.rangeFNET <- cbind(pres.fnetid, tru.range)
+names(tru.rangeFNET)[1] <- "FNETID"
+head(tru.rangeFNET, 2)
+```
 
-# create common x,y from tru pres and pseudo-abs x,y's
-# create new vars wgs_x & wgs_y; used later in raster stack extraction
-  rang.PPsA$tr.wgs_x <- ifelse(rang.PPsA$RANG106 == 0, rang.PPsA$cell.wgs_x, rang.PPsA$wgs_xF)
-  rang.PPsA$tr.wgs_y <- ifelse(rang.PPsA$RANG106 == 0, rang.PPsA$cell.wgs_y, rang.PPsA$wgs_yF) 
-  rang.PPsA[352:355, ] # examine a subset
-  # Now there are common columns to draw from in the future
+```{r}
+plot(pied.range.bufR, col = "gray70", legend = F, main = "Points in modelling frame")
+points(tru.range$wgs_xF, tru.range$wgs_yF, pch = 20, col = "darkgreen") 
+```
 
+```{r}
+buf.fnetid <- extract(pied.range.bufR, pied.range.fnetDF[c("cell.wgs_x", "cell.wgs_y")])
+tru.bufFNET <- cbind(pied.range.fnetDF, buf.fnetid) 
+head(tru.bufFNET, 2)
+```
+
+```{r}
+plot(pied.range.bufR, col = "gray90", legend = F, main = "Modelling frame on FISHNET")
+plot(pied.range.bufR, col = "gray50", legend = F, add = T)
+```
+
+```{r}
+plot(pied.range.bufR, col = "gray90", legend = F, 
+     main = "SP locations nested in modelling frame in FISHNET")
+plot(pied.range.bufR, col = "gray50", legend = F, add = T)
+points(tru.range$wgs_xF, tru.range$wgs_yF, pch = 20, col = "darkgreen")
+```
+
+```{r}
+m1 <- merge(pied.range.fnetDF, tru.bufFNET, by = c("FNETID", "cell.wgs_x", "cell.wgs_y"), all.y = T)
+head(m1, 2)
+```
+
+```{r}
+pied.indexFNET <- merge(m1, tru.rangeFNET, by = c("FNETID"), all = T) 
+head(pied.indexFNET, 2)
+```
+
+```{r}
+names(pied.indexFNET)[4] <- "in.modFR"
+
+# setwd(path.mod2)
+# p1 <- get(load("pied.indexFNET_MASTER.RData")) --> This is redundant, I think? Making my code fail, just renamed this
+
+p1 <- pied.indexFNET
+head(p1, 2)
+```
+
+```{r}
+p2.spp <- subset(p1$FNETID, p1$RANG106 == 1)
+p2.modFR <- subset(p1$FNETID, p1$in.modFR == 1)
+length(p2.spp) #back on track!
+```
+
+```{r}
+length(p2.modFR)
+```
+
+```{r}
+p3 <- p1[!p1$FNETID %in% p2.spp, ]
+p4 <- p1[!p1$FNETID %in% p2.spp & p1$FNETID %in% p2.modFR, ]
+psu.buf <- p4
+
+set.seed(1234) 
+psu.srs2 <- psu.buf[sample(1:nrow(psu.buf), 2 * table(p1$RANG106)[[1]], replace = F), ]
+psu.srs2$RANG106 <- 0  
+psu.srs2$in.modFR <- 1 
+dim(psu.srs2) 
+```
+
+```{r}
+head(psu.srs2, 2)
+```
+
+```{r}
+head(tru.rangeFNET, 2)
+```
+
+```{r}
+head(psu.srs2, 2)
+```
+
+```{r}
+pied.PPsA <- merge(tru.rangeFNET, psu.srs2, by = c("FNETID", "RANG106", "wgs_xF", "wgs_yF"), all = T)
+pied.PPsA$in.modFR <- NULL
+
+pied.PPsA$tr.wgs_x <- ifelse(pied.PPsA$RANG106 == 0, pied.PPsA$cell.wgs_x, pied.PPsA$wgs_xF)
+pied.PPsA$tr.wgs_y <- ifelse(pied.PPsA$RANG106 == 0, pied.PPsA$cell.wgs_y, pied.PPsA$wgs_yF)
 ```
 
 
@@ -288,19 +284,23 @@ head(psu.srs2,2)
 
 ```{r}
 setwd(path.mod2)
-save("rang.bufR", file="pied.framesR.RData")
-save("rang.bufSF", file = "rang.bufSF.RData")
-save("rang.bufSP", file = "rang.bufSP.RData")
+save("pied.range.bufR", file = "pied.framesR.RData")
+save("pied.range.bufSF", file = "pied.framesSF.RData")
+save("pied.range.bufSP", file = "pied.framesSP.RData")
 
-st_write(rang.fnetSF, dsn = ".", layer = "rang_fnetSF", driver = "ESRI Shapefile",
+setwd(path.mod2)
+st_write(pied.range.fnetSF, dsn = ".", layer = "piedrange_fnetSF", driver = "ESRI Shapefile",
          delete_layer = T, delete_dsn = T)
 
-save("rang.fnetSF", "rang.fnetDF", file = "pied.range.fnet.RData")
-save(rang.indexFNET, file = "rang.indexFNET.RData")
-write.csv(rang.PPsA, file = "rang_PPsA.csv", row.names = F)
-save(rang.PPsA, file = "rang.PPsA.RData")
 ```
 
+```{r}
+setwd(path.mod2)
+save("pied.range.fnetSF", "pied.range.fnetDF", file = "pied.range.fnet.RData")
+save(pied.indexFNET, file = "pied.indexFNET.RData")
+write.csv(pied.PPsA, file = "pied_PPsA.csv", row.names = F)
+save(pied.PPsA, file = "pied.PPsA.RData")
+```
 
 ---
 
