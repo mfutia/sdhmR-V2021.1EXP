@@ -1,62 +1,36 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "HW 7: Logistic Regression"
+author: "Group A: Eli Polzer, Matt Futia, Mia McReynolds"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+# knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r}
+# some pathnames; yours will be specific to your CPU !!
+  path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
+  
+# below is the recommended class root dir
+  #path.root <- "~/sdhmR-V2021.1"  # typical class root dir
+  path.mod2 <- paste(path.root, "/data/module02", sep = "")
+   path.mod5 <- paste(path.root, "/data/module05.01-LR", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+  
+# some libraries
+  library(tidyverse)
+   library(PresenceAbsence)  # fxns: optimal.thresholds, presence.absence.accuracy, 
+                            #       auc.roc.plot
+  library(DAAG)             # fxns: CVbinary
+  library(data.table)
+  library(raster)
+  library(grDevices)
+```
 
-## This exercise links to Module 5.1
-
-Submit the completed exercise to us at:
-
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to:
-* Estimate variables in reduced and full--variable logistic GLM models, significance, and direction of relationship
-* Calculate an estimate of model fit
-* Build a table of accuracy metrics, and AUC plot
-* Provide some bulleted interpretation points
-* Plot map products of the:
-  * (i) probability; and 
-  * (ii) classified distribution model
-  * (Save these two maps as **`.img`** files for use later in the course)
-
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
-
-## The Data
-
-* The dataframe completed in exercise #6.
-
----
 
 ## Question #1
 
@@ -65,13 +39,38 @@ Remember, you will have been assigned data for *edulis* having one the following
 
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# load range-wide training data
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/tr_RANG.Rdata")
+
+str(tr_RANG)
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+#pivot for ggplotting
+tr_RANG_long <- tr_RANG %>% 
+  pivot_longer(etpt_5:topos, names_to = "Variable", values_to = "Value") 
+
+head(tr_RANG_long, 3)
+```
+
+
+```{r}
+#summarise data 
+tr_RANG_long %>% group_by(Variable) %>% 
+  summarise(n = n(),
+            mean = mean(Value), 
+            sd = sd(Value), 
+            min = min(Value), 
+            max = max(Value))
+```
+```{r}
+#boxplot
+ggplot(tr_RANG_long, aes(y=Value)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales="free") +
+  theme_classic()
+```
+
 
 ---
 
@@ -80,13 +79,157 @@ If King's English interpretation is required, it will go here, after each code c
 * Construct full- and reduced-variable logistic GLM’s
 * Determine an estimate of model fit, based on deviance.
 
+
+```{r}
+######## START MODEL #1 => FULL MODEL, ALL VARS INCLUDED
+  mod1.LR.RANG <- glm(as.factor(RANG106) ~ etpt_5 + mind_yr_av + prad_sw_di + prec_w_hal + rough_1k + tmax_s_hal + topos, family = binomial, data = tr_RANG)
+
+# model 1 summary
+  summary(mod1.LR.RANG) # full model summary stats 
+```
+
+```{r}
+# model 1 fit
+  mod1.fit <- 100 * (1 - mod1.LR.RANG$deviance/mod1.LR.RANG$null.deviance) 
+      # extract values from above
+  mod1.fit  # examine fit
+```
+
+```{r}
+# model 1 prediction
+mod1.pred <- predict(mod1.LR.RANG, type = "response") # model prediction
+head(mod1.pred) # examine prediction - should be same length as input dataframe
+```
+
+
+```{r}
+######## START MODEL #2 => REDUCED VARIABLE MODEL
+# build parsimonious model w/var reduction techniques: mod2.LR
+#   variable reduction: backwards
+  mod2.LR.RANG <- step(mod1.LR.RANG, trace = F) # backwards stepwise variable reduction
+  summary(mod2.LR.RANG) # reduced model 
+```
+
+```{r}
+# model 1 v. model 2 fit: both pretty bad
+  100 * (1 - mod1.LR.RANG$deviance/mod1.LR.RANG$null.deviance)  # fit model 1
+  100 * (1 - mod2.LR.RANG$deviance/mod2.LR.RANG$null.deviance)  # fit model 2
+```
+Both of these models have the same formula, so their fit is the same. Not very good overall.
+
+```{r}
+# model 1 vs. 2 predictions
+  mod2.pred <- predict(mod2.LR.RANG, type = "response") # model prediction
+  head(mod2.pred)
+  head(mod1.pred)
+```
+For both, I got error messages that "glm.fit: fitted probabilities numerically 0 or 1 occurred", but I think that's ok, based on the videos. For question 3, I'll use model 2.
+
 ---
 
 ## Question #3
 
-* Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
+* Calculate accuracy metrics (full set as in Module 3.2 and 3.3, Analytical Intermission) using:
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
+  
+### Resubstitution approaches
+
+```{r}
+######## START RESUBSTITUTION ACCURACY CALCULATIONS, MODEL=LOGISTIC GLM
+# requires pkg PresenceAbsence
+#   build testing dataframe using mod2 predictions
+  modl <- "mod.LR.RANG" # add var to keep track of model
+  dat2 <- cbind(modl, tr_RANG[2], mod2.pred) # build dataframe w/mod2 predictions
+  head(dat2, 2) # examine prediction dataframe
+```
+
+
+```{r}
+# determine best threshold using PresenceAbsence package Sec7.1
+  mod.cut <- optimal.thresholds(dat2, opt.methods = c("Default")) # default threshold=0.5
+  mod.cut # examine threshold=DEFAULT of 0.5
+```
+
+```{r}
+# generate confusion matrix
+  mod2.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$mod2.pred >= mod.cut$mod2.pred)))
+  mod2.cfmat # examine
+```
+
+```{r}
+
+# calculate model accuracies with standard deviation=F
+  mod2.acc <- presence.absence.accuracy(dat2, threshold = mod.cut$mod2.pred, st.dev = F)
+  tss <- mod2.acc$sensitivity + mod2.acc$specificity - 1 # code TSS metric
+  mod2.acc <- cbind(mod2.acc[1:7], tss) # bind all metrics
+  mod2.acc[c(1, 4:5, 7:8)] # examine accuracies
+
+```
+
+```{r}
+# plotting AUC
+  auc.roc.plot(dat2, color = T) # basic AUC plot; pkg PresenceAbsence 
+```
+
+### 10-fold cross validation approach
+
+```{r}
+# perform 10-fold cross-validation
+  set.seed(1234) # set and save seed if desire replicability of samples
+  #library(DAAG) # load pkg for crossval
+  glm.cv10 <- CVbinary(mod1.LR.RANG, nfolds = 10, print.details = F) # crossval w/10 folds
+  head(glm.cv10$cvhat) # examine
+```
+### Compare both
+
+```{r}
+# examine resubstitution and cross-validation estimates
+  glm.pred <- mod2.pred # examine resub prediction 
+head(glm.pred)
+head(glm.cv10$cvhat) # examine xval prediction
+  glm.cvpred <- glm.cv10$cvhat # assign new name to crossval estimates
+  spp <- "spp106"
+  dat2 <- cbind(spp, tr_RANG[2], glm.pred, glm.cvpred) # build dataframe: true data plus the 2 validations
+  head(dat2, 2) # examine; NOTE will differ each run unless seed is saved 
+  
+```
+
+```{r}
+# estimate both resub and crossval accuracies
+#  create 3-column dataframes for PresenceAbsence
+  dat3 <- dat2[, c(1:3)] # includes column glm.pred
+  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred
+```
+
+
+```{r}
+# calculate model accuracies; resubstitution
+  mod.cut <- optimal.thresholds(dat3, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat3,threshold = mod.cut$glm.pred)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat3.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  head(dat3.acc) # examine
+```
+
+```{r}
+
+# calculate model accuracies; cross-validation
+  mod.cut <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat4, threshold = mod.cut$glm.cvpred)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat4.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  head(dat4.acc) # examine
+
+```
+
+
+```{r}
+# bind all accuracies into single dataframe
+  all.acc <- rbind(dat3.acc, dat4.acc) # bind all metrics
+  all.acc # examine - usually just report the cvpred (cross-validated).
+
+```
 
 ---
 
@@ -95,6 +238,77 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #3
+  
+```{r raw probability estimate}
+#load raster stack - pied.topoDOM
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM.RData") 
+
+# predict for LR & GAM
+#  S=raster stack; M=RF model; N.img=save an .img file
+#  accept the rest as R catechism specific to LR & GAM
+rang.probLR <- predict(rangeDOM,mod1.LR.RANG,filename="rang.probLR.img",type="response",fun=predict,index=2, overwrite=TRUE)
+rang.probLR
+```
+  
+```{r classified map data}
+# classification raster; bit more complicated 
+#   first determine classification threshold -- did this above.
+  mod.cut 
+
+rang.clasLR <- reclassify(rang.probLR, filename = "range.clas.LR.img", 
+   (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)), overwrite=TRUE)
+```
+```{r plot maps}
+######## START PROBABILITY & CLASSIFICATION PLOTS	 
+# boundaries for pretty maps (see Mod 2.5)
+  setwd(path.gis)
+  states <- st_read(dsn = ".", layer = "na_states_wgs") # import shapefile
+```
+
+```{r}
+# giggle maps
+  par(mfrow = c(1, 2))
+  plot(rang.probLR, legend = T, axes = T, main = "Probability Map") # plot probability map
+  plot(st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  plot(rang.clasLR, legend = T, axes = T, main = "Classification Map") # plot classification map
+  plot(st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  par(mfrow = c(1, 1))
+```
+
+```{r}
+
+# modify spatial map to modelling domain; use pied.bufptR from pied.framesR.RData Mod2
+# load some frames
+  setwd(path.mod2)
+  load("pied.framesR.RData") # load buffers: use pied.bufptR
+  pied.range.bufR # examine buffered pts raster
+
+# multiply extent by buffered pts 
+
+  plot(rang.probLR) # examine prob prediction map
+  plot(pied.range.bufR, add = T, col = "grey60") # examine plot modelling domain
+```
+
+```{r}
+  # range.pdom <- pied.range.bufR * rang.probLR # multiply prob raster by domain raster
+  # range.cdom <- pied.bufptR * pied.clasRF # multiply clas raster by domain raster
+  range.pdom <- crop(rang.probLR, pied.range.bufR)
+  range.cdom<- crop(rang.clasLR, pied.range.bufR)
+  
+  # extent(range.pdom)
+  # extent(range.pdom)
+  # extent(pied.range.bufR) --> All are the same extent?
+
+# giggle plots
+  par(mfrow = c(1, 2))
+  plot(range.pdom, legend = T, axes = T, main = "Probability Map") # plot clipped probability map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  plot(range.cdom, legend = F, axes = T, main = "Classification Map") # plot clipped classified map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5)  # add state boundaries
+  par(mfrow = c(1, 1))
+  
+  LRmaps_EX07 <- recordPlot()
+```
 
 ---
 
@@ -107,6 +321,21 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+setwd(path.mod5)
+# Accuracy metrics as a dataframe
+all.acc
+
+# Classification threshold as a stand--alone scalar
+mod.cut.EX7 <- mod.cut[[2]]
+
+#plot - also saved this manually
+LRmaps_EX07
+
+save(all.acc, mod.cut.EX7, LRmaps_EX07, file = "range.LR_EX07.RData")
+```
+
 
 ---
 

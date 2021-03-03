@@ -35,9 +35,8 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 * Break the predictor variables into logical groups of **topography**, **temperature**, and **precipitation**.  Do this by creating a new column called **`pred_type`** and add it the dataframe.
 
 ```{r}
-setwd(path.mod2)
-rang.trTOPO <- read_csv("rang.trTOPO.csv") 
-colnames(rang.trTOPO)
+# Load presence:pseudo-absence and predictor data
+load(paste(path.mod2, "/range_pres_psu_data.RData", sep = ""))
 ```
 I'm not going to add a new column, to preserve data structure, but groupings are (based on the HTML doc): 
 
@@ -49,13 +48,14 @@ I'm not going to add a new column, to preserve data structure, but groupings are
 
 Add groupings using Matt's code:
 ```{r}
-pred_groups = data.frame(names(rang.trTOPO[,6:21]))
+all_data = range_PPsA_ShortData
+pred_groups = data.frame(names(all_data[,18:33]))
 names(pred_groups) = "Variable"
 topo = c("exp1nrm","exp3nrm","exp5nrm","prad_sw_di","rough_1k","topos")
 temp = c("tave_s_hal","tave_sprin","tmax_s_hal","tmax_summe")
 precip = c("etpt_5","etpt_6","etpt_sprin","mind_yr_av","prec_w_hal","prec_winte")
-( pred_groups$pred_type = if_else(pred_groups$Variable %in% topo,"topography",
-                                if_else(pred_groups$Variable %in% temp,"temperature", "precipitation")) )
+pred_groups$pred_type = if_else(pred_groups$Variable %in% topo,"topography",
+                                if_else(pred_groups$Variable %in% temp,"temperature", "precipitation"))
 ```
 
 
@@ -71,7 +71,7 @@ precip = c("etpt_5","etpt_6","etpt_sprin","mind_yr_av","prec_w_hal","prec_winte"
 ```{r}
 # numeric correlations
   cut.point <- 0.7 # set cutpoint for correlation
-  c1 <- cor(pied.trTOPO[, c(5:20)], use = "pairwise.complete.obs", 
+  c1 <- cor(all_data[, c(18:33)], use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
 ```
@@ -102,7 +102,7 @@ panel.cor <- function(x, y, digits=2, prefix="", cex.cor)
   }
 
 # plot correlations using modified panel.cor function
-  pairs(pied.trTOPO[, c(5:20)], lower.panel = panel.smooth,
+  pairs(all_data[, c(18:33)], lower.panel = panel.smooth,
   upper.panel = panel.cor, main = "Topo Variables")
 
 ```
@@ -113,14 +113,14 @@ The panel plot of all variables' correlations is pretty hard to see here, but zo
 ```{r}
 # numeric correlations
   cut.point <- 0.7 # set cutpoint for correlation
-  c1 <- cor(dplyr::select(rang.trTOPO, one_of(topo)), use = "pairwise.complete.obs", 
+  c1 <- cor(dplyr::select(all_data, one_of(topo)), use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
   c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
   c2 # examine; FALSE indicates cor<cutpoint 
 
 # plot correlations using modified panel.cor function
-  pairs(dplyr::select(rang.trTOPO, one_of(topo)), lower.panel = panel.smooth,
+  pairs(dplyr::select(all_data, one_of(topo)), lower.panel = panel.smooth,
   upper.panel = panel.cor, main = "Topo Variables")
 ```
 
@@ -129,14 +129,14 @@ First, topography: exp1 and exp3, exp3 and exp5, exp5 and topos are strongly cor
 ```{r}
 # numeric correlations
   cut.point <- 0.7 # set cutpoint for correlation
-  c1 <- cor(dplyr::select(rang.trTOPO, one_of(temp)), use = "pairwise.complete.obs", 
+  c1 <- cor(dplyr::select(all_data, one_of(temp)), use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
   c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
   c2 # examine; FALSE indicates cor<cutpoint 
 
 # plot correlations using modified panel.cor function
-  pairs(dplyr::select(rang.trTOPO, one_of(temp)), lower.panel = panel.smooth,
+  pairs(dplyr::select(all_data, one_of(temp)), lower.panel = panel.smooth,
   upper.panel = panel.cor, main = "Temp Variables")
 ```
 
@@ -145,14 +145,14 @@ Second, temperature: all of these variables are significantly correlated.
 ```{r}
 # numeric correlations
   cut.point <- 0.7 # set cutpoint for correlation
-  c1 <- cor(dplyr::select(rang.trTOPO, one_of(precip)), use = "pairwise.complete.obs", 
+  c1 <- cor(dplyr::select(all_data, one_of(precip)), use = "pairwise.complete.obs", 
     method = "spearman") # est. correlation
   c1 # examine
   c2 <- subset(c1 > cut.point | c1 < -cut.point) # matrix of cor>cutpoint
   c2 # examine; FALSE indicates cor<cutpoint 
 
 # plot correlations using modified panel.cor function
-  pairs(dplyr::select(rang.trTOPO, one_of(precip)), lower.panel = panel.smooth,
+  pairs(dplyr::select(all_data, one_of(precip)), lower.panel = panel.smooth,
   upper.panel = panel.cor, main = "Precip Variables")
 ```
 
@@ -185,7 +185,7 @@ varimp.glm <- function(tr.spp, tr.var, pres, pf, pl) {
 
 ```{r}
 # estimate VIP values => AIC & Adj deviance
-  tr.vip <- as.data.frame(rang.trTOPO[,c(2, 6:21)]) # keep only P/A & predictors - had to make this a df to get GLM to work
+  tr.vip <- as.data.frame(all_data[,c(2, 18:33)]) # keep only P/A & predictors - had to make this a df to get GLM to work
   pres <- 1 # column for presence:absence
   v.start <- 2 # column start predictor variables
   v.stop <- ncol(tr.vip) # last column predictor variables
@@ -215,19 +215,14 @@ abline(mean(dev.fit[, 2]), 0, lt = 3) # ref lines; dash=mean adj.dev
 * Justify your decision(s) to keep / remove variables using bullets
 
 ```{r}
-remove <- c("etpt_6", "etpt_sprin", "prec_winte", "tave_s_hal", "tave_sprin", "tmax_summe", "exp1nrm", "exp3nrm", "exp5nrm")
+remove = c("etpt_6", "etpt_sprin", "prec_winte", "tave_s_hal", "tave_sprin", "tmax_summe", "exp1nrm", "exp3nrm", "exp5nrm")
 
-tr_RANG <-  select(rang.trTOPO, !one_of(remove))
+tr_RANG <-all_data %>% 
+  dplyr::select(-c(wgs_xF:tave_s_hal.x, cell.wgs_x, cell.wgs_y)) %>% 
+  dplyr::select(-c(etpt_6, etpt_sprin, prec_winte, tave_s_hal, tave_sprin, tmax_summe, exp1nrm, exp3nrm, exp5nrm))
 ```
 
-<!-- * prad sw di: average significance for the topo group, but uncorrelated to rough 1K, so I'm comfortable including it.  -->
-<!-- * rough 1k: By far most significant VIP for the topo group.  -->
-
-<!-- * tmax s hal: maximum temperature for April-September addresses hottest season of the year. All temperature vars had a similar importance, and all were strongly correlated, so I will select just one of them from this suite.  -->
-<!-- * tave_s_hal: correlated to tmax, but I'd assume that this is average temp over the growing season, so I'll include it to hit requirement of a couple vars per category. Or, could say that this is from expert opinion.  -->
-
-<!-- * etpt 6: all 3 evapotranspiration variables were highly correlated, but this one had highest VIP factor.  -->
-<!-- * prec w half: higher VIP than precip winter, and highly correlated, so I'll choose this one.  -->
+<!
 
 <!-- * mind_yr_av: highly correlated to etpt vars, and a moisture index that is likely modeled, so this is my reluctant 7th choice for variables list. Has a high VIP though.  -->
 
@@ -248,13 +243,17 @@ These data will be used as we next begin the SDHM model constructions.
 ```{r}
 # write out data files if desired
   setwd(path.mod2)
+
+  # Convert data.frame to shapefile
+tr_RANG_SF <- st_as_sf(tr_RANG, coords = c("tr.wgs_x", "tr.wgs_y"), crs = prj.wgs84, remove = F)
+
+save(tr_RANG, tr_RANG_SF, file = "tr_RANG.Rdata")
   write.csv(tr_RANG, file = "tr_RANG.csv", row.names = F) # save .csv - training data
-  save(tr_RANG, file = "tr_RANG.RData") # save .RData - pres/abs plus stacked raster
-  save(tr_RANG, file = "tr_RANG.RData") # save .RData - stacked raster
-  st_write(tr_RANG, dsn = ".", layer = "tr_RANG", driver = "ESRI Shapefile",
+  
+
+  st_write(tr_RANG_SF, dsn = ".", layer = "tr_RANG", driver = "ESRI Shapefile",
     delete_layer = T, delete_dsn = T) #point shapefile in ESRI format
 ```
-
 
 ---
 

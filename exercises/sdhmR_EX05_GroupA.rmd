@@ -36,7 +36,7 @@ prj.wgs84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs" # epsg:4326
 
 ```{r}
 #load presence/absence data 
-  pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/pied.PPsA_range.RData")) 
+  pres.abs <- get(load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/range_pres_psu_data.RData")) 
   head(pres.abs, 2) 
 ```
   
@@ -114,7 +114,7 @@ It looks like all CRS's of rasters are WGS84, so I won't have to re-project. Als
 
 ```{r}
 
-# layers <- c(etpt5, etpt6, etptsprin, exp1nrm, exp3nrm, exp5nrm, mindyrav, pradswdi, precwhal, precwinte, taveshal, tavesprin, tmaxshal, tmaxsumme, rough, topos)
+layers <- c(etpt5, etpt6, etptsprin, exp1nrm, exp3nrm, exp5nrm, mindyrav, pradswdi, precwhal, precwinte, taveshal, tavesprin, tmaxshal, tmaxsumme, rough1k, topos)
 
 # build the raster stack
   rangeDOM <- stack(layers) # create a raster stack
@@ -123,12 +123,15 @@ It looks like all CRS's of rasters are WGS84, so I won't have to re-project. Als
 
 ```{r}
 # extract from stack 
-  t1 <- raster::extract(rangeDOM, pied.PPsA[, c("tr.wgs_x", "tr.wgs_y")])
+  t1 <- raster::extract(rangeDOM, range_PPsA_Data[, c("tr.wgs_x", "tr.wgs_y")])
 vars <- sub(".img", "", colnames(t1))
 colnames(t1) <- vars
 head(t1, 2) 
+any(is.na(t1))
 ```
-This is causing issues-- there are NAs in predictors bc it's not punching out correctly.  Still not working, even after copying others' code and trying to re-download source files... How can this be??? 
+<!-- This is causing issues-- there are NAs in predictors bc it's not punching out correctly.  Still not working, even after copying others' code and trying to re-download source files... How can this be???  -->
+
+Got the new file from Matt-- it's working!!!
 
 ---
 
@@ -137,14 +140,15 @@ This is causing issues-- there are NAs in predictors bc it's not punching out co
 * Create a new dataframe by binding the extracted predictor variable values to the dataframe from exercise #4.
 
 ```{r}
-  rang.trTOPO <- cbind(pres.abs, t1_RANG) %>% # bind to train dataframe
-    select(-c(wgs_xF, wgs_yF, x, y))
-
-  head(rang.trTOPO, 2) # examine training data frame
-  
+# ## bind presence/pseudoabsence with predictors
+# range_PPsA_Data <- cbind(pres.abs, t1)
+# 
+# ### remove columns that only contain NA
+# range_PPsA_ShortData <- range_PPsA_Data[,colSums(is.na(range_PPsA_Data))<nrow(range_PPsA_Data)]
+# 
+# head(range_PPsA_Data, 2)
 ```
 
-I removed the wgs_xF and cell.wgs_x columns, since all coords are in tr.wgs_x. 
 
 ```{r}
 ggplot(rang.trTOPO, aes(x=tr.wgs_x, y=tr.wgs_y)) +
@@ -187,10 +191,12 @@ These data will be used in the next exercise #6.
   setwd(path.mod2)
   write.csv(rang.trTOPO, file = "rang.trTOPO.csv", row.names = F) # save .csv - training data
   save(rang.trTOPO, file = "rang.trTOPO.RData") # save .RData - pres/abs plus stacked raster 
-  save(pied.topoDOM, file = "pied.topoDOM.RData") # save .RData - stacked raster
+  save(rangeDOM, file = "rangeDOM.RData") # save .RData - stacked raster
   st_write(rang.trTOPO, dsn = ".", layer = "rang.trTOPO", driver = "ESRI Shapefile",
     delete_layer = T, delete_dsn = T) #point shapefile in ESRI format
 ```
+
+Good dataset = range_PPsA_shortdata
 
 ---
 
