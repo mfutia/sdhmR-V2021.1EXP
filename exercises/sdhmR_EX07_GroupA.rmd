@@ -28,7 +28,6 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
   library(DAAG)             # fxns: CVbinary
   library(data.table)
   library(raster)
-  library(grDevices)
 ```
 
 
@@ -310,6 +309,9 @@ rang.clasLR <- reclassify(rang.probLR, filename = "range.clas.LR.img",
   LRmaps_EX07 <- recordPlot()
 ```
 
+# Question: 
+Are both of these frames supposed to be the same extent?
+
 ---
 
 ## Question #5
@@ -325,15 +327,15 @@ These data will be used again in Module 10, Ensemble Models.
 ```{r}
 setwd(path.mod5)
 # Accuracy metrics as a dataframe
-all.acc
+all.acc_EX07 <- all.acc
 
 # Classification threshold as a stand--alone scalar
-mod.cut.EX7 <- mod.cut[[2]]
+mod.cut_EX07 <- mod.cut[[2]]
 
 #plot - also saved this manually
 LRmaps_EX07
 
-save(all.acc, mod.cut.EX7, LRmaps_EX07, file = "range.LR_EX07.RData")
+save(all.acc_EX07, mod.cut_EX07, LRmaps_EX07, file = "range.LR_EX07.RData")
 ```
 
 
