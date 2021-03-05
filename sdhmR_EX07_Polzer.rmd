@@ -1,0 +1,236 @@
+---
+title: "Model Assessment & Uncertainty"
+author: "Eli L. Polzer"
+date: "4 March 2021"
+output: html_document
+---
+
+## Question #1
+
+* Import and explore data
+  * **NOTE**:  intent is not to reduce number of variables; that was completed in exercise #5.  Rather, calculate simple descriptive statistics (mean, sd, n) and boxplots
+
+
+```{r}
+path.root <- "C:/Users/epolzer/Documents/sdhmR-V2021.1"
+path.dat <- paste(path.root, "/sdhmR-V2021.1EXP/Data/exercise/traindat", sep = "")
+path.mod2 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module02", sep = "")
+path.mod5 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module05.01-LR", sep = "")
+path.figs <- paste(path.root, "/sdhmR-V2021.1EXP/Figures", sep = "")
+path.gis <- paste(path.root, "/sdhmR-V2021.1EXP/Data/gis_layers", sep = "")
+path.mod4 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module04", sep = "")
+
+library(PresenceAbsence)
+library(DAAG)
+library(dplyr)
+library(raster)
+
+setwd(path.mod5) 
+dat1 <- read.csv("tr_RANG.FINAL.csv", header = T) # import training data
+  
+aggregate(dat1 [, 9:15], list(presabs = dat1$RANG106), FUN = mean, na.rm = T)
+aggregate(dat1 [, 9:15], list(presabs = dat1$RANG106), FUN = sd, na.rm = T)
+aggregate(dat1 [, 9:15], list(presabs = dat1$RANG106), FUN = median, na.rm = T)
+
+par(mfrow = c(1,7))
+boxplot(dat1$etpt_5 ~ dat1$RANG106, xlab = "Presence:Absence", ylab = "ETPT5")
+boxplot(dat1$exp1nrm ~ dat1$RANG106, xlab = "Presence:Absence", ylab = "EXP1NRM")
+boxplot(dat1$mind_yr_av ~ dat1$RANG106, xlab = "Presence:Absence", ylab = "MINDYRAV")
+boxplot(dat1$prad_sw_di ~ dat1$RANG106, xlab = "Presence:Absence", ylab = "PRADSWDI")
+boxplot(dat1$prec_w_hal ~ dat1$RANG106, xlab = "Presence:Absence", ylab = "PRECWHAL")
+boxplot(dat1$rough_1k ~ dat1$RANG106, xlab = "Presence:Absence", ylab = "ROUGH1K")
+boxplot(dat1$tmax_s_hal ~ dat1$RANG106, xlab = "Presence:Absence", ylab = "TMAXSHAL")
+```
+
+---
+
+## Question #2
+
+* Construct full- and reduced-variable logistic GLM’s
+* Determine an estimate of model fit, based on deviance.
+```{r}
+## Build model formula as alternative hard code:
+##   This is a general purpose fxn for creating model formula used in most R stat analyses
+  mod.form <- function(dat, r.col, p.col) {
+    # generic glm formula construction function; inputs as: 
+    #  resp =>col 1 in dataframe; preds=>col 2 thru ncol such that p.col=2 
+    #  NOTE: vars as factors must be coerced PRIOR to formula construction 
+    # example call: mod.form(dat1, 1, 2)
+    n.col <- ncol(dat) # No. columns in dataframe
+    resp <- colnames(dat[r.col]) # assign resp column name
+    resp <- paste("as.factor(", colnames(dat[r.col]), ")", sep = "") # assign resp column name
+    pred <- colnames(dat[c(p.col:n.col)]) # assign preds column names
+    mod.formula <- as.formula(paste(resp, "~", paste(pred, collapse = "+"))) # build formula
+    } 
+
+## Build initial model all variables: mod1.LR:
+# hard code version
+  mod1.LR <- glm(as.factor(RANG106) ~ etpt_5 + exp1nrm + mind_yr_av + prad_sw_di + prec_w_hal + rough_1k + tmax_s_hal, 
+    family = binomial, data = dat1)
+# NOT RUN; build formula from fxn version
+  #mod1.LR <- glm(mod.form(dat1, 1, 2), family = binomial, data = dat1)
+
+## Model 1 summary:
+  summary(mod1.LR) # full model summary stats 
+
+## Model 1 fit:
+  mod1.fit <- 100 * (1 - mod1.LR$deviance/mod1.LR$null.deviance) # model fit
+  mod1.fit  # examine fit
+  mod1.pred <- predict(mod1.LR, type = "response") # model prediction
+
+## Model 1 prediction:
+  head(mod1.pred) # examine prediction
+  length(mod1.pred)
+  dim(dat1)
+  
+  ls()
+  ls(mod1.LR) # all values buried within model object
+################################################################################
+
+################################################################################
+## START MODEL #2 => REDUCED VARIABLE MODEL::
+## Build parsimonious model w/var reduction techniques: mod2.LR:
+#   variable reduction: backwards
+  mod2.LR <- step(mod1.LR, trace = F) # backwards stepwise variable reduction
+  mod2.fit <- 100 * (1 - mod2.LR$deviance/mod2.LR$null.deviance)
+  mod2.fit # model fit
+
+## Model 1 v. model 2 fit:
+  100 * (1 - mod1.LR$deviance/mod1.LR$null.deviance)  # fit model 1
+  100 * (1 - mod2.LR$deviance/mod2.LR$null.deviance)  # fit model 2
+
+## Model 2 prediction:
+  mod2.pred <- predict(mod2.LR, type = "response") # model prediction
+  head(mod2.pred)
+
+## Model 1 v. model 2 prediction:
+  head(mod1.pred) # mod 1 prediction
+  head(mod2.pred) # mod 2 prediction
+
+## Model 2 sumAUGy:
+  summary(mod2.LR) # reduced model sumAUGy 
+```
+
+---
+
+## Question #3
+
+* Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
+  * Resubstitution approaches, and
+  * A 10-fold cross--validation approach
+```{r}
+## START RESUBSTITUTION ACCURACY CALCULATIONS, MODEL=LOGISTIC GLM::
+# requires pkg PresenceAbsence
+#   build testing dataframe using mod2 predictions
+  modl <- "mod2.LR" # add var to keep track of model
+  dat2 <- cbind(modl, dat1[2], mod2.pred) # build dataframe w/mod2 predictions
+  head(dat2, 2) # examine prediction dataframe
+  
+## Determine best threshold using PresenceAbsence package Sec7.1:
+  #library(PresenceAbsence) # PresenceAbsence for accuracy metrics
+  # help(optimal.thresholds) # options for optimizing threshold
+  mod.cut <- optimal.thresholds(dat2, opt.methods = c("Default")) # default threshold=0.5
+  mod.cut # examine threshold=DEFAULT of 0.5
+
+## Generate  matrix:
+  mod2.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$mod2.pred >= mod.cut$mod2.pred)))
+  mod2.cfmat # examine
+
+## Calculate model accuracies with standard deviation=F:
+  mod2.acc <- presence.absence.accuracy(dat2, threshold = mod.cut$mod2.pred, st.dev = F)
+  tss <- mod2.acc$sensitivity + mod2.acc$specificity - 1 # code TSS metric
+  mod2.acc <- cbind(mod2.acc[1:7], tss) # bind all metrics
+  mod2.acc[c(1, 4:5, 7:8)] # examine accuracies
+
+## Plot AUC:
+  auc.roc.plot(dat2, color = T) # basic AUC plot; pkg PresenceAbsence 
+
+## Save plot if desired: 
+  #setwd(path.figs)
+  #savePlot(filename = "mod4fig01.pdf", type = "pdf")
+################################################################################
+
+################################################################################
+## START CROSS-VALIDATION ACCURACY CALCULATIONS, MODEL=LOGISTIC GLM::
+## Cross-validation:
+  set.seed(1234) 
+  mod2.cv10 <- CVbinary(mod2.LR, nfolds = 10, print.details = F) # crossval w/10 folds
+  head(mod2.cv10$cvhat) # examine
+  ls(mod2.cv10) # examine
+
+## Examine:
+  glm.pred <- mod2.pred
+  head(glm.pred) # examine
+  glm.cvpred <- mod2.cv10$cvhat # assign new name 
+  spp <- "spp106"
+  dat2 <- cbind(spp, dat1[2], glm.pred, glm.cvpred)
+  head(dat2, 2) # examine
+  
+## Estimate re-substitution and cross-validation accuracies:
+  dat3 <- dat2[, c(1:3)] # includes column glm.pred
+  dat4 <- dat2[, c(1:2,4)] # includes column glm.cvpred
+  
+## Calculate model accuracies; re-substitution:
+  mod.cut3 <- optimal.thresholds(dat3, opt.methods = c("ObsPrev")) 
+  mod1.acc <- presence.absence.accuracy(dat3, threshold = mod.cut3$glm.pred)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 
+  dat3.acc <- cbind(mod1.acc[1:7], tss) 
+  head(dat3.acc) # examine
+  
+## Calculate model accuracies; cross-validation:
+  mod.cut4 <- optimal.thresholds(dat4, opt.methods = c("ObsPrev"))
+  mod1.acc <- presence.absence.accuracy(dat4, threshold = mod.cut4$glm.cvpred)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1
+  dat4.acc <- cbind (mod1.acc[1:7], tss)
+  head(dat4.acc) # examine
+
+## Bind accuracies into single dataframe:
+  acc.3.4 <- rbind(dat3.acc, dat4.acc) # bind all metrics
+  acc.3.4 
+  
+## Plot AUC:
+  auc.roc.plot(dat3, color = T) # basic AUC plot; pkg PresenceAbsence 
+  auc.roc.plot(dat4, color = T)
+```
+
+---
+
+## Question #4
+
+* Build 2 prediction maps:
+  * A raw probability estimate for each cell in the modelling domain; and
+  * A classified map based on the selected threshold from Question #3
+```{r}
+  
+ 
+```
+  ## Issues with calling raster stack, so could not create first plots AND Issues with multiplying rasters by model frame rasters, so could not create set of clipped plots
+---
+
+## Question #5
+
+* Save your data as R objects:
+  * Accuracy metrics as a dataframe;
+  * Classification threshold as a stand--alone scalar
+  * Both prediction maps as **`.img`** format
+* Save these R objects in a **`.RData`** file
+
+These data will be used again in Module 10, Ensemble Models.
+```{r}
+  setwd(path.mod5)
+
+## Save accuracy metrics as DF: --> HOW??
+  acc.3.4
+
+## Save classification threshold as a stand--alone scalar: --> HOW??
+  mod.cut.LR.7 <- mod.cut[[2]]
+
+## Save all as R objects:
+  save(acc.3.4, mod.cut.LR.7, file = "rang.LR.7.RData")
+```
+
+---
+
+## The End
+
+---
