@@ -1,19 +1,12 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 7 Group A"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
@@ -65,13 +58,51 @@ Remember, you will have been assigned data for *edulis* having one the following
 
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# Load packages
+library(tidyverse)
+library(data.table)
+library(PresenceAbsence) # PresenceAbsence for accuracy metrics
+library(DAAG)
+
+# Set working directories
+path.root <- "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP"
+path.mod2 <- paste(path.root, "/data/module02", sep = "")
+path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+
+# Load CRSs
+setwd(path.root)
+source("r_code/prjs4_sdhmR.r")
+ls(pattern = "prj.")
+
+# Load presence:pseudo-absence and predictor data
+load(paste(path.mod2, "/range_pres_psu_data.RData", sep = ""))
+load(paste(path.mod2, "/tr_RANG.Rdata", sep = ""))
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+vars = colnames(range_PPsA_ShortData[,18:33])
+
+smmry <- range_PPsA_ShortData %>%
+  group_by(RANG106) %>%
+  summarise(AVE_etpt5 = mean(etpt_5), SD_etpt5 = sd(etpt_5),
+            AVE_mind_yr_av = mean(mind_yr_av), SD_mind_yr_av = sd(mind_yr_av),
+            AVE_prad_sw_di = mean(prad_sw_di), SD_prad_sw_di = sd(prad_sw_di),
+            AVE_prec_w_hal = mean(prec_w_hal), SD_prec_w_hal = sd(prec_w_hal),
+            AVE_rough_1k = mean(rough_1k), SD_rough_1k = sd(rough_1k),
+            AVE_tmax_s_hal = mean(tmax_s_hal), SD_tmax_s_hal = sd(tmax_s_hal),
+            AVE_topos = mean(topos), SD_topos = sd(topos))
+
+smmry
+
+ggplot(tr_RANG)+
+  geom_boxplot(data = tr_RANG, aes(RANG106, tmax_s_hal))
+ggplot(tr_RANG)+
+  geom_boxplot(data = tr_RANG, aes(RANG106, mind_yr_av))
+ggplot(tr_RANG)+
+  geom_boxplot(data = tr_RANG, aes(RANG106, rough_1k))
+```
+
 
 ---
 
@@ -79,6 +110,32 @@ If King's English interpretation is required, it will go here, after each code c
 
 * Construct full- and reduced-variable logistic GLM’s
 * Determine an estimate of model fit, based on deviance.
+
+**Full-variable logistic GLM**
+```{r}
+colnames(range_PPsA_ShortData[,18:33])
+FullRange <- glm(RANG106 ~ etpt_5+etpt_6+etpt_sprin+exp1nrm+exp3nrm+exp5nrm+mind_yr_av+prad_sw_di+prec_w_hal+prec_winte+rough_1k+tave_s_hal+tave_sprin+tmax_s_hal+tmax_summe+topos, family = binomial, data = range_PPsA_ShortData)
+summary(FullRange)
+
+FullRange.fit <- 100 * (1 - FullRange$deviance/FullRange$null.deviance)
+FullRange.fit
+FullRange$deviance
+FullRange.pred <- predict(FullRange, type = "response")
+```
+*Based on the deviance (`r FullRange$deviance`) for the full model and the D<sup>2</sup> (0.166), the fit of this model is poor.*
+
+**Reduced-variable logistic GLM**
+```{r}
+PartRange <- glm(RANG106 ~ etpt_5+mind_yr_av+prad_sw_di+prec_w_hal+rough_1k+tmax_s_hal+topos, 
+    family = binomial, data = tr_RANG)
+summary(PartRange)
+
+PartRange.fit <- 100 * (1 - PartRange$deviance/PartRange$null.deviance)
+PartRange.fit
+PartRange$deviance
+PartRange.pred <- predict(PartRange, type = "response")
+```
+*Based on the deviance (`r PartRange$deviance`) for the reduced model and the D<sup>2</sup> (0.128), the fit of this model is also poor.*
 
 ---
 
@@ -88,6 +145,46 @@ If King's English interpretation is required, it will go here, after each code c
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
 
+**Accuracy with Resubstitution**
+```{r}
+modl <- "mod2.LR"
+dat2 <- cbind(modl, tr_RANG[2], PartRange.pred)
+head(dat2, 2)
+
+mod.cut <- optimal.thresholds(dat2, opt.methods = c("Default"))
+mod.cut
+
+# generate confusion matrix
+PartRange.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$PartRange.pred >= mod.cut$PartRange.pred)))
+PartRange.cfmat
+
+# calculate model accuracies with standard deviation=F
+PartRange.acc <- presence.absence.accuracy(dat2, threshold = mod.cut$PartRange.pred, st.dev = F)
+tss <- PartRange.acc$sensitivity + PartRange.acc$specificity - 1
+PartRange.acc <- cbind(PartRange.acc[1:7], tss)
+PartRange.acc[c(1, 4:5, 7:8)]
+
+auc.roc.plot(dat2, color = T)
+```
+
+**Accuracy with 10-fold Cross Validation**
+```{r}
+PartRange.cv <- CVbinary(PartRange, nfolds = 10, print.details = F)
+PartRange.cv <- PartRange.cv$cvhat
+dat2 <- cbind(dat2, PartRange.cv)
+head(dat2)
+
+# generate confusion matrix
+PartRange.cfmatJ <- table(dat2[[2]], factor(as.numeric(dat2$PartRange.cv >= mod.cut$PartRange.pred)))
+PartRange.cfmatJ
+
+# calculate model accuracies with standard deviation=F
+PartRange.accB <- presence.absence.accuracy(dat2, threshold = mod.cut$PartRange.pred, st.dev = F)
+tss <- PartRange.accB$sensitivity + PartRange.accB$specificity - 1
+PartRange.accB <- cbind(PartRange.accB[1:7], tss)
+PartRange.accB[c(1, 4:5, 7:8)]
+```
+*Two methods produced similar accuracy results*
 ---
 
 ## Question #4
@@ -95,6 +192,23 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #3
+
+**Raw Probability Estimate**
+```{r}
+setwd(path.mod2)
+load("rangeDOM.RData") 
+rang.probLR <- predict(rangeDOM,FullRange,filename="FullRange.probLR.img",type="response",fun=predict,index=2, overwrite=TRUE)
+rang.probLR
+```
+
+**Classidfied Map**
+```{r classified map data}
+rang.clasLR <- reclassify(rang.probLR, filename = "range.clas.LR.img", 
+   (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)), overwrite=TRUE)
+
+```
+
+```
 
 ---
 
