@@ -28,6 +28,7 @@ knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
   library(DAAG)             # fxns: CVbinary
   library(data.table)
   library(raster)
+  library(sf)
 ```
 
 
@@ -100,6 +101,8 @@ mod1.pred <- predict(mod1.LR.RANG, type = "response") # model prediction
 head(mod1.pred) # examine prediction - should be same length as input dataframe
 ```
 
+In the full model, all variables were at least moderately significant. However, model fit was poor-- only 12%.
+
 
 ```{r}
 ######## START MODEL #2 => REDUCED VARIABLE MODEL
@@ -114,7 +117,7 @@ head(mod1.pred) # examine prediction - should be same length as input dataframe
   100 * (1 - mod1.LR.RANG$deviance/mod1.LR.RANG$null.deviance)  # fit model 1
   100 * (1 - mod2.LR.RANG$deviance/mod2.LR.RANG$null.deviance)  # fit model 2
 ```
-Both of these models have the same formula, so their fit is the same. Not very good overall.
+Both of these models have the same formula, so their fit is the same. Not very good overall. 
 
 ```{r}
 # model 1 vs. 2 predictions
@@ -122,7 +125,7 @@ Both of these models have the same formula, so their fit is the same. Not very g
   head(mod2.pred)
   head(mod1.pred)
 ```
-For both, I got error messages that "glm.fit: fitted probabilities numerically 0 or 1 occurred", but I think that's ok, based on the videos. For question 3, I'll use model 2.
+
 
 ---
 
@@ -230,6 +233,8 @@ head(glm.cv10$cvhat) # examine xval prediction
 
 ```
 
+Very similar results in resubstitution and cross-validation approaches, so this model may be able to handle new data decently.
+
 ---
 
 ## Question #4
@@ -272,45 +277,10 @@ rang.clasLR <- reclassify(rang.probLR, filename = "range.clas.LR.img",
   plot(rang.clasLR, legend = T, axes = T, main = "Classification Map") # plot classification map
   plot(st_geometry(states), add = T, lwd = 1.5) # add state boundaries
   par(mfrow = c(1, 1))
-```
-
-```{r}
-
-# modify spatial map to modelling domain; use pied.bufptR from pied.framesR.RData Mod2
-# load some frames
-  setwd(path.mod2)
-  load("pied.framesR.RData") # load buffers: use pied.bufptR
-  pied.range.bufR # examine buffered pts raster
-
-# multiply extent by buffered pts 
-
-  plot(rang.probLR) # examine prob prediction map
-  plot(pied.range.bufR, add = T, col = "grey60") # examine plot modelling domain
-```
-
-```{r}
-  # range.pdom <- pied.range.bufR * rang.probLR # multiply prob raster by domain raster
-  # range.cdom <- pied.bufptR * pied.clasRF # multiply clas raster by domain raster
-  range.pdom <- crop(rang.probLR, pied.range.bufR)
-  range.cdom<- crop(rang.clasLR, pied.range.bufR)
-  
-  # extent(range.pdom)
-  # extent(range.pdom)
-  # extent(pied.range.bufR) --> All are the same extent?
-
-# giggle plots
-  par(mfrow = c(1, 2))
-  plot(range.pdom, legend = T, axes = T, main = "Probability Map") # plot clipped probability map
-  plot(sf::st_geometry(states), add = T, lwd = 1.5) # add state boundaries
-  plot(range.cdom, legend = F, axes = T, main = "Classification Map") # plot clipped classified map
-  plot(sf::st_geometry(states), add = T, lwd = 1.5)  # add state boundaries
-  par(mfrow = c(1, 1))
   
   LRmaps_EX07 <- recordPlot()
 ```
 
-# Question: 
-Are both of these frames supposed to be the same extent?
 
 ---
 
@@ -337,7 +307,6 @@ LRmaps_EX07
 
 save(all.acc_EX07, mod.cut_EX07, LRmaps_EX07, file = "range.LR_EX07.RData")
 ```
-
 
 ---
 

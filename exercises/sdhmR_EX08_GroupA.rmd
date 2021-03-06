@@ -1,62 +1,35 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 8 Group A"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+# knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
 #knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
 
-## This exercise links to Module 5.2
-
-Submit the completed exercise to us at:
-
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to:
-* Variables in final model, significance, and direction of relationship
-  * List which variables are "smoothed" vs, those that are not
-* Plots of the "smoothed" variables
-* Calculate an estimate of model fit
-* Build a table of accuracy metrics, and AUC plot
-* Provide some bulleted interpretation points
-* Plot map products of the:
-  * (i) probability; and 
-  * (ii) classified distribution model
-  * (Save these two maps as **`.img`** files for use later in the course)
-
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
-
-## The Data
-
-* The dataframe completed in exercise #6.
+```{r}
+# some pathnames; yours will be specific to your CPU !!
+  path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1" 
+  path.mod2 <- paste(path.root, "/data/module02", sep = "")
+  path.mod5.2 <- paste(path.root, "/data/module05.02-GAM", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+  
+# some libraries
+  library(tidyverse)
+  library(PresenceAbsence)  # fxns: optimal.thresholds, presence.absence.accuracy, 
+                            #       auc.roc.plot
+  library(DAAG)     
+  library(raster)
+  library(car) 
+  library(gam)
+  library(sf)
+```
 
 ---
 
@@ -65,15 +38,35 @@ Remember, you will have been assigned data for *edulis* having one the following
 * Import and explore data
   * **NOTE**:  intent is not to reduce number of variables; that was completed in exercise #5.  Rather, calculate simple descriptive statistics (mean, sd, n) and boxplots
 
-
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# load range-wide training data
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/tr_RANG.Rdata")
+
+str(tr_RANG)
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+#pivot for ggplotting/summary 
+tr_RANG_long <- tr_RANG %>% 
+  pivot_longer(etpt_5:topos, names_to = "Variable", values_to = "Value") 
+
+tr_RANG_long %>% group_by(Variable) %>% 
+  summarise(n = n(),
+            mean = mean(Value), 
+            sd = sd(Value), 
+            min = min(Value), 
+            max = max(Value))
+```
+
+```{r}
+#boxplot
+ggplot(tr_RANG_long, aes(y=Value)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales="free") +
+  theme_classic()
+```
+
+I used the same methods as in Exercise 7. 
 
 ---
 
@@ -82,13 +75,97 @@ If King's English interpretation is required, it will go here, after each code c
 * Construct some basic plots to assess possible relationships warranting use of a GAM
 * List which variables may be amenable to a GAM--based smoother
 
+```{r}
+plot(tr_RANG[5:11])
+```
+
+```{r}
+# factor plots - part 1
+
+  par(mfcol = c(1, 3)) # if desired
+  col.list <- c("grey80", "forestgreen") # specified color ramp
+  plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$etpt_5, xlab = "etpt_5", ylab = "Pinus edulis category", 
+    col = col.list)
+  plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$mind_yr_av, xlab = "mind_yr_av", 
+    ylab = "Pinus edulis category", col = col.list) 
+  plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$prad_sw_di, xlab = "prad_sw_di", ylab = "Pinus edulis category", 
+    col = col.list) 
+  par(mfrow = c(1, 1))
+```
+
+```{r}
+# factor plots - part 2
+  par(mfcol = c(1, 4)) # if desired
+  col.list <- c("grey80", "forestgreen") # specified color ramp
+  plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$prec_w_hal, xlab = "prec_w_hal", ylab = "Pinus edulis category", 
+    col = col.list)
+  plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$rough_1k, xlab = "rough_1k", 
+    ylab = "Pinus edulis category", col = col.list) 
+  plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$tmax_s_hal, xlab = "tmax_s_hal", ylab = "Pinus edulis category", 
+    col = col.list) 
+  plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$topos, xlab = "topos", ylab = "Pinus edulis category", 
+    col = col.list) 
+  par(mfrow = c(1, 1))
+```
+Based on these plots, it appears that many variables could be best fit using a smoother, since they have several different "sections" with differing slopes. Only etpt_5 seems linear. Variables to examine further for GAM smoothers:
+* mind_yr_av
+* prad_sw_di
+* prec_w_hal
+* rough_1k
+* tmax_s_hal
+* topos
+
+Some of these look like they would only benefit from a smoother at extreme values, so it will be important to examine the cost/benefit to the model fit of smoothing these. 
+
 ---
 
 ## Question #3
 
 * Construct a set of GAMs from fully linear to a maximum of 5 splines
   * Use lowess smoother rather than default spline
+  
+```{r}
+# GAM model 0: all linear
+# alternative linear model using gam call
+  mod0.GAM_RANGE <- gam(RANG106 ~ etpt_5 + mind_yr_av + prad_sw_di + prec_w_hal + rough_1k + tmax_s_hal + topos, 
+    family = binomial, data = tr_RANG)
+  summary(mod0.GAM_RANGE) # model #0 summary
+```
 
+```{r}
+# GAM model 1: 2 smoothers
+mod1.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av, span=0.5) + lo(prad_sw_di, span=0.5) + lo(prec_w_hal, span=0.5) + lo(rough_1k, span=0.5) + lo(tmax_s_hal, span=0.5) + lo(topos, span=0.5), family = binomial, data = tr_RANG)
+
+summary(mod1.GAM_RANGE)
+```
+
+I only used smoothers on the variables listed above, not etpt_5. It looks like span is supposed to range from 0 to 1, so I set it to 0.5 here for 2 smoothers/neighborhoods. 
+
+
+
+```{r, warning=FALSE}
+# GAM model 2: smoothers=3
+mod2.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av,span=0.33) + lo(prad_sw_di,0.33) + lo(prec_w_hal,0.33) + lo(rough_1k,0.33) + lo(tmax_s_hal,0.33) + lo(topos,0.33), family = binomial, data = tr_RANG)
+
+summary(mod2.GAM_RANGE) # model #2 summary - different factors are sign.!
+  # for example, if a var. is sign. in both 4 and 5 smoothers, just use 4 for parsimony
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+# GAM model 3: smoothers=4
+mod3.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av,span=0.25) + lo(prad_sw_di,span=0.25) + lo(prec_w_hal,span=0.25) + lo(rough_1k,span=0.25) + lo(tmax_s_hal,span=0.25) + lo(topos,span=0.25), family = binomial, data = tr_RANG)
+
+summary(mod3.GAM_RANGE)
+```
+
+```{r}
+# GAM model 4: smoothers=5
+mod4.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av,span=0.2) + lo(prad_sw_di,span=0.2) + lo(prec_w_hal,span=0.2) + lo(rough_1k,span=0.2) + lo(tmax_s_hal,span=0.2) + lo(topos,span=0.2), family = binomial, data = tr_RANG)
+
+summary(mod4.GAM_RANGE)
+```
+  
 ---
 
 ## Question #4
@@ -96,6 +173,224 @@ If King's English interpretation is required, it will go here, after each code c
 * Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
+  
+```{r}
+#setup 
+  set.seed(1234) 
+  spp <- "SPP106"
+  
+# predict from GAMs above
+gam.pred0 <- predict(mod0.GAM_RANGE, type = "response")
+gam.pred1 <- predict(mod1.GAM_RANGE, type = "response")
+gam.pred2 <- predict(mod2.GAM_RANGE, type = "response")
+gam.pred3 <- predict(mod3.GAM_RANGE, type = "response")
+gam.pred4 <- predict(mod4.GAM_RANGE, type = "response")
+```
+
+```{r}
+### mod0.GAM_RANGE - I've shortened this code from the example/template
+
+# perform 10-fold cross-validation
+  glm.cv10 <- CVbinary(mod0.GAM_RANGE, nfolds = 10, print.details = F) # crossval w/10 folds
+
+# examine resubstitution and cross-validation estimates
+  gam.cvpred0 <- glm.cv10$cvhat # assign new name to crossval estimates
+  dat2 <- cbind(spp, tr_RANG[2], gam.pred0, gam.cvpred0) # build dataframe: true data plus the 2 validation s
+  # head(dat2, 2) # examine; NOTE will differ each run unless seed is saved 
+  #       spp  SPPRES106   glm.pred glm.cvpred
+  # 1 spp106         0 0.01332101 0.01372558
+  # 2 spp106         0 0.02029524 0.02169578
+  
+  
+# estimate both resub and crossval accuracies
+#  create 3-column dataframes for PresenceAbsence
+  dat3 <- dat2[, c(1:3)] # includes column glm.pred = spp, spppres106, and glm.pred
+  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred = spp, spppres106, and glm.cvpred
+
+# calculate model accuracies; resubstitution
+  mod.cut <- optimal.thresholds(dat3, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat3,threshold = mod.cut$gam.pred0)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat3.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat3.acc) # examine
+
+# calculate model accuracies; cross-validation
+  mod.cut <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat4, threshold = mod.cut$gam.cvpred0)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat4.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat4.acc) # examine
+  
+  # bind all accuracies into single dataframe
+  acc_mod0 <- rbind(dat3.acc, dat4.acc) # bind all metrics
+  acc_mod0
+```
+
+```{r}
+### mod1.GAM_RANGE - find and replace 0 with 1... Could make this a loop later
+
+# perform 10-fold cross-validation
+  glm.cv10 <- CVbinary(mod1.GAM_RANGE, nfolds = 10, print.details = F) # crossval w/10 folds
+
+# examine resubstitution and cross-validation estimates
+  gam.cvpred1 <- glm.cv10$cvhat # assign new name to crossval estimates
+  dat2 <- cbind(spp, tr_RANG[2], gam.pred1, gam.cvpred1) # build dataframe: true data plus the 2 validation s
+  # head(dat2, 2) # examine; NOTE will differ each run unless seed is saved 
+  #       spp  SPPRES106   glm.pred glm.cvpred
+  # 1 spp106         0 0.01332101 0.01372558
+  # 2 spp106         0 0.02029524 0.02169578
+  
+  
+# estimate both resub and crossval accuracies
+#  create 3-column dataframes for PresenceAbsence
+  dat3 <- dat2[, c(1:3)] # includes column glm.pred = spp, spppres106, and glm.pred
+  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred = spp, spppres106, and glm.cvpred
+
+# calculate model accuracies; resubstitution
+  mod.cut <- optimal.thresholds(dat3, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat3,threshold = mod.cut$gam.pred1)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat3.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat3.acc) # examine
+
+# calculate model accuracies; cross-validation
+  mod.cut <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat4, threshold = mod.cut$gam.cvpred1)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat4.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat4.acc) # examine
+  
+  # bind all accuracies into single dataframe
+  acc_mod1 <- rbind(dat3.acc, dat4.acc) # bind all metrics
+  acc_mod1
+```
+
+```{r}
+### mod2.GAM_RANGE
+
+# perform 10-fold cross-validation
+  glm.cv10 <- CVbinary(mod2.GAM_RANGE, nfolds = 10, print.details = F) # crossval w/10 folds
+
+# examine resubstitution and cross-validation estimates
+  gam.cvpred2 <- glm.cv10$cvhat # assign new name to crossval estimates
+  dat2 <- cbind(spp, tr_RANG[2], gam.pred2, gam.cvpred2) # build dataframe: true data plus the 2 validation s
+  # head(dat2, 2) # examine; NOTE will differ each run unless seed is saved 
+  #       spp  SPPRES106   glm.pred glm.cvpred
+  # 1 spp106         0 0.01332101 0.01372558
+  # 2 spp106         0 0.02029524 0.02169578
+  
+  
+# estimate both resub and crossval accuracies
+#  create 3-column dataframes for PresenceAbsence
+  dat3 <- dat2[, c(1:3)] # includes column glm.pred = spp, spppres106, and glm.pred
+  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred = spp, spppres106, and glm.cvpred
+
+# calculate model accuracies; resubstitution
+  mod.cut <- optimal.thresholds(dat3, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat3,threshold = mod.cut$gam.pred2)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat3.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat3.acc) # examine
+
+# calculate model accuracies; cross-validation
+  mod.cut <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat4, threshold = mod.cut$gam.cvpred2)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat4.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat4.acc) # examine
+  
+  # bind all accuracies into single dataframe
+  acc_mod2 <- rbind(dat3.acc, dat4.acc) # bind all metrics
+  acc_mod2
+```
+
+```{r}
+### mod3.GAM_RANGE
+
+# perform 10-fold cross-validation
+  glm.cv10 <- CVbinary(mod3.GAM_RANGE, nfolds = 10, print.details = F) # crossval w/10 folds
+
+# examine resubstitution and cross-validation estimates
+  gam.cvpred3 <- glm.cv10$cvhat # assign new name to crossval estimates
+  dat2 <- cbind(spp, tr_RANG[2], gam.pred3, gam.cvpred3) # build dataframe: true data plus the 2 validation s
+  # head(dat2, 2) # examine; NOTE will differ each run unless seed is saved 
+  #       spp  SPPRES106   glm.pred glm.cvpred
+  # 1 spp106         0 0.01332101 0.01372558
+  # 2 spp106         0 0.02029524 0.02169578
+  
+  
+# estimate both resub and crossval accuracies
+#  create 3-column dataframes for PresenceAbsence
+  dat3 <- dat2[, c(1:3)] # includes column glm.pred = spp, spppres106, and glm.pred
+  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred = spp, spppres106, and glm.cvpred
+
+# calculate model accuracies; resubstitution
+  mod.cut <- optimal.thresholds(dat3, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat3,threshold = mod.cut$gam.pred3)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat3.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat3.acc) # examine
+
+# calculate model accuracies; cross-validation
+  mod.cut <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat4, threshold = mod.cut$gam.cvpred3)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat4.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat4.acc) # examine
+  
+  # bind all accuracies into single dataframe
+  acc_mod3 <- rbind(dat3.acc, dat4.acc) # bind all metrics
+  acc_mod3
+```
+
+```{r}
+### mod4.GAM_RANGE
+
+# perform 10-fold cross-validation
+  glm.cv10 <- CVbinary(mod4.GAM_RANGE, nfolds = 10, print.details = F) # crossval w/10 folds
+
+# examine resubstitution and cross-validation estimates
+  gam.cvpred4 <- glm.cv10$cvhat # assign new name to crossval estimates
+  dat2 <- cbind(spp, tr_RANG[2], gam.pred4, gam.cvpred4) # build dataframe: true data plus the 2 validation s
+  # head(dat2, 2) # examine; NOTE will differ each run unless seed is saved 
+  #       spp  SPPRES106   glm.pred glm.cvpred
+  # 1 spp106         0 0.01332101 0.01372558
+  # 2 spp106         0 0.02029524 0.02169578
+  
+  
+# estimate both resub and crossval accuracies
+#  create 3-column dataframes for PresenceAbsence
+  dat3 <- dat2[, c(1:3)] # includes column glm.pred = spp, spppres106, and glm.pred
+  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred = spp, spppres106, and glm.cvpred
+
+# calculate model accuracies; resubstitution
+  mod.cut <- optimal.thresholds(dat3, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat3,threshold = mod.cut$gam.pred4)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat3.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat3.acc) # examine
+
+# calculate model accuracies; cross-validation
+  mod.cut <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.acc <- presence.absence.accuracy(dat4, threshold = mod.cut$gam.cvpred4)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  dat4.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  # head(dat4.acc) # examine
+  
+  # bind all accuracies into single dataframe
+  acc_mod4 <- rbind(dat3.acc, dat4.acc) # bind all metrics
+  acc_mod4
+```
+
+
+```{r}
+# bind all accuracies into single dataframe
+  all.acc <- rbind(acc_mod0, acc_mod1, acc_mod2, acc_mod3, acc_mod4) # bind all metrics
+  all.acc # examine - usually just report the cvpred (cross-validated). Resub metrics may have a false sense of security
+```
+  
+Model 4 is my top pick-- it's consistently in the top few models based on these criteria, especially within the set of cross-validated metrics. Model 2 would also be a good pick, and is more parsimonious.
+
 
 ---
 
@@ -104,6 +399,77 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #4
+
+```{r raw probability estimate, message=FALSE, error=FALSE}
+#load raster stack - pied.topoDOM
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM.RData") 
+
+# predict for LR & GAM
+#  S=raster stack; M=RF model; N.img=save an .img file
+#  accept the rest as R catechism specific to LR & GAM
+
+rang.probGAM <- predict(rangeDOM,mod4.GAM_RANGE,filename="rang.probGAM.img", type="response", fun=predict,index=2, overwrite=TRUE)
+rang.probGAM
+
+```
+
+This is running really slowly, and I'm getting a lot of error messages when trying to run model 4. Test with the linear model?
+
+```{r classified map data}
+# classification raster; bit more complicated 
+#   first determine classification threshold -- 
+  ### get mod.cut value from  mod4.GAM_RANGE (has been over-written since run above)
+
+# perform 10-fold cross-validation
+  glm.cv10 <- CVbinary(mod4.GAM_RANGE, nfolds = 10, print.details = F) # crossval w/10 folds
+
+# examine resubstitution and cross-validation estimates
+  gam.cvpred4 <- glm.cv10$cvhat # assign new name to crossval estimates
+  dat2 <- cbind(spp, tr_RANG[2], gam.pred4, gam.cvpred4) # build dataframe: true data plus the 2 validation s
+ 
+  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred = spp, spppres106, and glm.cvpred
+
+# calculate model accuracies; cross-validation
+  mod.cut_final <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+
+#classify 
+rang.clasGAM <- reclassify(rang.probGAM, filename = "range.clas.GAM.img", 
+   (c(0, mod.cut_final[[2]], 0, mod.cut_final[[2]], 1, 1)), overwrite=TRUE)
+
+
+# NOT RUN: basic reclassify based on threshold mod.cut per above
+  #modfinl.GAMclas = reclassify(modfinl.GAMprob, c(0,mod.cut[[2]], 0, mod.cut[[2]], 1, 1))
+  #writeRaster(modfinl.GAMclas, filename = "modfinl.GAMclas.img", format = "HFA")
+```
+
+```{r plot maps}
+######## START PROBABILITY & CLASSIFICATION PLOTS	 
+# boundaries for pretty maps (see Mod 2.5)
+  setwd(path.gis)
+  states <- st_read(dsn = ".", layer = "na_states_wgs") # import shapefile
+  
+  # load some frames
+  setwd(path.mod2)
+  load("pied.framesR.RData") # load buffers: use pied.bufptR
+  pied.range.bufR 
+```
+
+```{r}
+   range.pdom_GAM <- crop(rang.probGAM, pied.range.bufR)
+  range.cdom_GAM <- crop(rang.clasGAM, pied.range.bufR)
+
+# giggle plots
+  par(mfrow = c(1, 2))
+  plot(rang.probGAM, legend = T, axes = T, main = "Probability Map") # plot clipped probability map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  plot(rang.clasGAM, legend = F, axes = T, main = "Classification Map") # plot clipped classified map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5)  # add state boundaries
+  par(mfrow = c(1, 1))
+  
+  GAMmaps_EX08 <- recordPlot()
+```
+
+
 
 ---
 
@@ -116,6 +482,21 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+setwd(path.mod5.2)
+# Accuracy metrics as a dataframe
+all.acc_EX08 <- all.acc
+
+# Classification threshold as a stand--alone scalar
+mod.cut.EX08 <- mod.cut_final[[2]]
+
+#plot - also saved this manually
+GAMmaps_EX08
+
+save(all.acc_EX08, mod.cut.EX08, GAMmaps_EX08, file = "range.GAM_EX08.RData")
+```
+
 
 ---
 
