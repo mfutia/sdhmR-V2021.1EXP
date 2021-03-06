@@ -147,7 +147,7 @@ I only used smoothers on the variables listed above, not etpt_5. It looks like s
 # GAM model 2: smoothers=3
 mod2.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av,span=0.33) + lo(prad_sw_di,0.33) + lo(prec_w_hal,0.33) + lo(rough_1k,0.33) + lo(tmax_s_hal,0.33) + lo(topos,0.33), family = binomial, data = tr_RANG)
 
-summary(mod2.GAM_RANGE) # model #2 summary - different factors are sign.!
+summary(mod2.GAM_RANGE) # model #2 summary
   # for example, if a var. is sign. in both 4 and 5 smoothers, just use 4 for parsimony
 ```
 
@@ -389,7 +389,7 @@ gam.pred4 <- predict(mod4.GAM_RANGE, type = "response")
   all.acc # examine - usually just report the cvpred (cross-validated). Resub metrics may have a false sense of security
 ```
   
-Model 4 is my top pick-- it's consistently in the top few models based on these criteria, especially within the set of cross-validated metrics. Model 2 would also be a good pick, and is more parsimonious.
+Model 2 is my top pick-- it's consistently in the top few models based on these criteria, especially within the set of cross-validated metrics. Model 4 would also be a good pick but is less parsimonious?
 
 
 ---
@@ -408,12 +408,12 @@ load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM
 #  S=raster stack; M=RF model; N.img=save an .img file
 #  accept the rest as R catechism specific to LR & GAM
 
-rang.probGAM <- predict(rangeDOM,mod4.GAM_RANGE,filename="rang.probGAM.img", type="response", fun=predict,index=2, overwrite=TRUE)
+rang.probGAM <- predict(rangeDOM, mod2.GAM_RANGE, filename="rang.probGAM.img", type="response", fun=predict,index=2, overwrite=TRUE)
 rang.probGAM
 
 ```
 
-This is running really slowly, and I'm getting a lot of error messages when trying to run model 4. Test with the linear model?
+This is running really slowly, and I'm getting a lot of error messages "extrapolation not allowed". Only 
 
 ```{r classified map data}
 # classification raster; bit more complicated 
