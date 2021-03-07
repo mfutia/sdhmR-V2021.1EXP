@@ -19,6 +19,7 @@ path.root <-"~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1"
   #path.root <- "~/sdhmR-V2021.1"  # typical class root dir
   path.mod5.3 <- paste(path.root, "/data/module05.03-MAX", sep = "")
   path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
 
 # load libraries now if desired; loaded below when needed
   library(dismo)

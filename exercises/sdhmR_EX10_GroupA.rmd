@@ -1,60 +1,35 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "EX10 Group A"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
 #knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r}
+path.root <-"~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1"
+  path.mod5.4 <- paste(path.root, "/data/module05.04-RF", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
 
-## This exercise links to Module 5.4
+# load libraries now if desired; loaded below when needed
+  library(randomForest)
+  library(PresenceAbsence)
+  library(dplyr)
+  library(sf)
+  library(DAAG)
+  library(caret)
+  library(e1071)
+  library(caTools)
+  library(rpart)
 
-Submit the completed exercise to us at:
+```
 
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to:
-* Produce and interpret variable importance plots
-* Build a table of accuracy metrics, and AUC plot
-* Plot map products of the:
-  * (i) probability; and 
-  * (ii) classified distribution model
-  * (Save these two maps as **`.img`** files for use later in the course)
-
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
-
-## The Data
-
-* The dataframe completed in exercise #6.
-
----
 
 ## Question #1
 
@@ -63,20 +38,95 @@ Remember, you will have been assigned data for *edulis* having one the following
 
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# load range-wide training data
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/tr_RANG.Rdata")
+
+str(tr_RANG)
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+#pivot for ggplotting/summary 
+tr_RANG_long <- tr_RANG %>% 
+  pivot_longer(etpt_5:topos, names_to = "Variable", values_to = "Value") 
 
+tr_RANG_long %>% group_by(Variable) %>% 
+  summarise(n = n(),
+            mean = mean(Value), 
+            sd = sd(Value), 
+            min = min(Value), 
+            max = max(Value))
+```
+
+```{r}
+#boxplot
+ggplot(tr_RANG_long, aes(y=Value)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales="free") +
+  theme_classic()
+```
+
+Same code as in exercise 9. 
 ---
 
 ## Question #2
 
 * Construct a Random Forest (RF) model using the presence:absence data
 * Build plots of variable importance values
+
+```{r}
+# build model formula as alternative hard code
+  mod.form <- function(dat ,r.col, p.col) {
+  # generic formula construction function; inputs as:
+  #  resp =>col 1 in dataframe such that r.col=1, 
+  #  preds=>col 2 thru ncol in dataframe such that p.col=2
+  #  NOTE: predictor vars as factors; coerce PRIOR to formula construction
+  # example call: mod.form(dat1,1,2)
+   n.col <- ncol(dat) # No. columns in dataframe
+   resp <- colnames(dat[r.col]) # assign resp column name
+   resp <- paste("as.factor(", colnames(dat[r.col]), ")", sep = "") # assign resp column name, factor for RF!
+   pred <- colnames(dat[c(p.col:n.col)]) # assign preds column names
+   mod.formula <- as.formula(paste(resp, "~", paste(pred, collapse = "+"))) # build formula 
+  }
+
+  #mod.form says predictors start in col 2 and go to to the ncol
+  # importance allows importance plots. keep.forest important for predicting later
+  mod1.RF_RANG <- randomForest(mod.form(tr_RANG, 2, 5), importance = T, 
+    keep.forest = T, data = tr_RANG) # RF model w/mod.form fxn
+  mod1.pred_RANG <- predict(mod1.RF_RANG, type = "prob")[, 2] # predict from model - [,2] scales it to 1!
+       # is this what's wrong with my EX8?
+  head(mod1.pred_RANG) # examine 
+```
+
+```{r}
+# variable importance plots
+  varImpPlot(mod1.RF_RANG, main = "Variable Importance Plots")
+  #remember these are not statistically relevant-- interpret subjectively!
+```
+
+Rough 1k and tmax_s_hal are the two most important variables, followed by prec_w_hal and mind_yr_av. 
+
+
+```{r}
+# partial plots for a few significant vars
+  par(mfrow = c(1, 2))
+  partialPlot(mod1.RF_RANG, tr_RANG, rough_1k, which.class = "1", main = "Partial Plot: rough_1k", 
+    ylab = "Logit(Presence)")
+  partialPlot(mod1.RF_RANG, tr_RANG, tmax_s_hal, which.class = "1", main = "Partial Plot: tmax_s_hal", 
+    ylab = "Logit(Presence)") 
+  par(mfrow = c(1, 1)) 
+```
+
+Pinus edulis more likely to be found at higher elevations, and at tmax_s_hal around 200-250. 
+
+```{r}
+# partial plots for a few significant vars
+  par(mfrow = c(1, 2))
+  partialPlot(mod1.RF_RANG, tr_RANG, prec_w_hal, which.class = "1", main = "Partial Plot: prec_w_hal", 
+    ylab = "Logit(Presence)")
+  partialPlot(mod1.RF_RANG, tr_RANG, mind_yr_av, which.class = "1", main = "Partial Plot: mind_yr_av", 
+    ylab = "Logit(Presence)") 
+  par(mfrow = c(1, 1)) 
+```
 
 ---
 
@@ -88,6 +138,107 @@ If King's English interpretation is required, it will go here, after each code c
 * Extract the Out--of--Bag (OOB) estimate of model accuracy
 * Compare that to the resubstitution and 10--fold cross--validation accuracy metrics
 
+
+```{r}
+######## START RESUBSTITUTION ACCURACY CALCULATIONS, MODEL=RF
+# build testing dataframe using model #1 predictions
+  modl <- "mod1.RF_RANG" # add var to keep track of model
+  dat2 <- cbind(modl, tr_RANG[2], mod1.pred_RANG) # build dataframe w/mod1 predictions
+  head(dat2, 2) # examine prediction dataframe 
+```
+
+```{r}
+# determine best threshold using PresenceAbsence package Sec7.1
+  # help(optimal.thresholds) # options for optimizing threshold
+  mod.cut=optimal.thresholds(dat2,opt.methods=c('ObsPrev')); mod.cut 
+
+# generate confusion matrix
+  mod1.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$mod1.pred_RANG >= mod.cut$mod1.pred_RANG)))
+  mod1.cfmat # examine
+```
+
+```{r}
+# calculate model accuracies with standard deviation=F
+  mod1.acc <- presence.absence.accuracy(dat2, threshold = mod.cut$mod1.pred_RANG, st.dev = F)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1 # code TSS metric
+  mod1.acc <- cbind(mod1.acc[1:7], tss) # bind all metrics
+  mod1.acc[c(1, 4:5, 7:8)] # examine accuracies 
+
+# plotting AUC
+  auc.roc.plot(dat2, color = T) # basic AUC plot; pkg PresenceAbsence 
+```
+
+Model fit seems alright based on sens/spec, but TSS is really low-- about 50%, same as random chance. AUC also not great, especially for random forest. 
+```{r cross validation}
+# https://rstudio-pubs-static.s3.amazonaws.com/71575_4068e2e6dc3d46a785ad7886426c37db.html
+
+#make train and test data
+spl <- sample.split(tr_RANG$RANG106, SplitRatio = 0.7)
+Train <- subset(tr_RANG, spl == TRUE)
+Test <- subset(tr_RANG, spl == FALSE)
+
+#set up cross validation
+numFolds <- trainControl(method = "cv", number = 10)
+
+cpGrid <- expand.grid(.cp = seq(0.01, 0.5, 0.01))
+
+train(mod.form(tr_RANG, 2, 5), data = Train, method = "rpart", trControl = numFolds, tuneGrid = cpGrid)
+
+```
+
+```{r}
+mod1.RF_RANG.CV <- rpart(mod.form(tr_RANG, 2, 5), data = Train, method = "class", cp = 0.01)
+#weird to convert from factor to numeric
+predictionCV <- as.numeric(predict(mod1.RF_RANG.CV, newdata = Test, type = "class")) -1 
+
+spp <- "RANGE106"
+
+dat4 <- cbind(spp, Test[2],predictionCV) # build dataframe: true data plus the 2 validation s
+  head(dat4, 2) 
+```
+
+
+```{r}
+# calculate model accuracies; cross-validation
+  mod.cutCV <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.accCV <- presence.absence.accuracy(dat4, threshold = mod.cutCV$predictionCV)
+  tss <- mod1.accCV$sensitivity + mod1.accCV$specificity - 1 # code TSS metric
+  dat4.acc_CV <- cbind(mod1.accCV[1:7], tss) # bind all metrics
+  head(dat4.acc_CV)
+```
+
+
+
+```{r start OOB}
+# OOB confusion matrix & class.error
+  mod1.RF_RANG$confusion # OOB confusion
+```
+
+```{r}
+# OOB accuracy estimates with standard deviation=F
+
+  oob.acc <- presence.absence.accuracy(dat2, st.dev = F) # oob accuracies
+  tss <- oob.acc$sensitivity + oob.acc$specificity - 1 # code TSS metric
+  oob.acc <- cbind(oob.acc[1:7], tss) # bind all metrics
+  oob.acc[c(1, 4:5, 7:8)] # examine accuracies
+```
+
+```{r}
+# comparison of all 3 accuracies
+  mod1.acc[c(1, 4:5, 7:8)] # examine resub accuracies
+  oob.acc[c(1, 4:5, 7:8)] # examine OOB accuracies 
+  head(dat4.acc_CV) #cross validation
+```
+
+```{r}
+#make into a classification metric dataframe
+test <- c("resubstitution", "OOB", "10fold_cross_validation")
+
+all.acc_EX10 <- bind_rows(mod1.acc[c(1, 4:5, 7:8)], oob.acc[c(1, 4:5, 7:8)], dat4.acc_CV) %>% 
+  cbind(test, .)
+```
+
+
 ---
 
 ## Question #4
@@ -95,6 +246,41 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #3
+  
+```{r}
+# boundaries for pretty maps (see Mod 2.5)
+  setwd(path.gis)
+  states <- st_read(dsn = ".", layer = "na_states_wgs") # import shapefile
+  
+# load raster stack
+  load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM.RData")
+```
+  
+```{r}
+# predict for final RF model
+  # ASSUME pred.dom is a raster stack per Module 4.1
+mod.RANG.RFprob <- predict(rangeDOM, mod1.RF_RANG, filename = "mod.RANG.RFprob.img",
+ type = "prob", fun = predict, index = 2, overwrite = T) # prob map
+writeRaster(mod.RANG.RFprob, filename = "mod.RANG.RFprob.img", format = "HFA")
+
+# basic reclassify based on threshold mod.cut per above
+mod.RANG.RFclas <- reclassify(mod.RANG.RFprob, filename = "mod.RANG.RFclas.img",
+   (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)), overwrite = T) # class map
+writeRaster(mod.RANG.RFclas, filename = "mod.RANG.RFclas.img", format = "HFA")
+```
+  
+  
+```{r}
+ par(mfrow = c(1, 2))
+  plot(mod.RANG.RFprob, legend = T, axes = T, main = "Probability Map") # plot clipped probability map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  plot(mod.RANG.RFclas, legend = F, axes = T, main = "Classification Map") # plot clipped classified map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5)  # add state boundaries
+  par(mfrow = c(1, 1))
+  
+  RFmaps_EX10 <- recordPlot()
+```
+  
 
 ---
 
@@ -107,6 +293,22 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+setwd(path.mod5.4)
+
+# Accuracy metrics as a dataframe
+all.acc_EX10
+
+# Classification threshold as a stand--alone scalar
+mod.cut.EX10 <- mod.cut[[2]]
+
+#plot - also saved this manually
+RFmaps_EX10
+
+save(all.acc_EX10, mod.cut.EX10, RFmaps_EX10, file = "range.RF_EX10.RData")
+```
+
 
 ---
 
