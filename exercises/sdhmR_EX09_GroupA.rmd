@@ -1,52 +1,37 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 9 Group A"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
 knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
 #knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r}
+# some pathnames; yours will be specific to your CPU !!
+path.root <-"~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1"
+  
+# below is the recommended class root dir
+  #path.root <- "~/sdhmR-V2021.1"  # typical class root dir
+  path.mod5.3 <- paste(path.root, "/data/module05.03-MAX", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
 
-## This exercise links to Module 5.3
+# load libraries now if desired; loaded below when needed
+  library(dismo)
+  library(raster)
+  library(PresenceAbsence)
+  library(maptools)
+  options("rgdal_show_exportToProj4_warnings"="none") # run this before library(rgdal)
+  library(rgdal)
+  library(tidyverse)
+  library(sf)
 
-Submit the completed exercise to us at:
+```
 
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to:
-* Produce and interpret variable importance plots
-* Build a table of accuracy metrics, and AUC plot
-* Plot map products of the:
-  * (i) probability; and 
-  * (ii) classified distribution model
-  * (Save these two maps as **`.img`** files for use later in the course)
-
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
 
 ---
 
@@ -61,22 +46,74 @@ Remember, you will have been assigned data for *edulis* having one the following
 * Import and explore data
   * **NOTE**:  intent is not to reduce number of variables; that was completed in exercise #5.  Rather, calculate simple descriptive statistics (mean, sd, n) and boxplots
 
-
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# load range-wide training data
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/tr_RANG.Rdata")
+
+str(tr_RANG)
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+#pivot for ggplotting/summary 
+tr_RANG_long <- tr_RANG %>% 
+  pivot_longer(etpt_5:topos, names_to = "Variable", values_to = "Value") 
+
+tr_RANG_long %>% group_by(Variable) %>% 
+  summarise(n = n(),
+            mean = mean(Value), 
+            sd = sd(Value), 
+            min = min(Value), 
+            max = max(Value))
+```
+```{r}
+#boxplot
+ggplot(tr_RANG_long, aes(y=Value)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales="free") +
+  theme_classic()
+```
 
 ---
 
 ## Question #2
 
 * Construct a MAXENT model using the presence:absence data
-* Build plots of variable importance values
+* Build plots of variable importance values & interpret
+
+```{r}
+######## START MAXENT MODEL #2: TRUE PRESENCE:ABSENCE DATA
+# some data cleaning before maxent
+  setwd(path.mod5.3)
+
+#here, tr_RANG = dat1
+  table(tr_RANG$RANG106)
+  head(tr_RANG, 2) # examine    
+  n.col <- ncol(tr_RANG)
+  n.col # number of columns
+  names(tr_RANG) # verify col No.s for model entry
+```
+
+
+```{r}
+#library(dismo) # best library for maxent
+  mod2.MAX_RANG <- maxent(tr_RANG[5:n.col], tr_RANG[2]) # call for true pres:abs 
+# NOTE:  typing "mod2.MAX" in R redirects output to browser
+  mod2.MAX_RANG
+  #differences in the plots when feeding in true pres-abs data
+
+```
+
+```{r}
+  plot(mod2.MAX_RANG)
+```
+
+The most important variables are rough1k and tmax_s_hal (~30%), followed by etpt_5 and mind_yr_av (~18%). 
+
+```{r}
+  response(mod2.MAX_RANG) # prediction vs. var plot
+```
+
+Several of these have interesting relationships. 
 
 ---
 
@@ -85,6 +122,97 @@ If King's English interpretation is required, it will go here, after each code c
 * Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
+  
+```{r}
+# RESUBSTITUTION 
+
+# maxent prediction and validation
+  mod2.pred <- predict(mod2.MAX_RANG, tr_RANG[5:11]) # maxent prediction
+  modl <- "mod2.MAX_RANG" # var placeholder
+  dat2 <- cbind(modl, tr_RANG[2], mod2.pred) # build dataframe w/mod1 predictions
+  head(dat2) # examine prediction dataframe
+```
+
+```{r}
+# evaluate model (an x-fold process: see help(evaluate)). 
+
+# pred.dom is the rasterstack...need to load range.DOM
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM.RData")
+
+  # name p = pres points and a=abs points specifically, and call their coords
+  mod2.val <- evaluate(mod2.MAX_RANG, p = tr_RANG[tr_RANG$RANG106 == 1, c(3:4)], 
+    a = tr_RANG[tr_RANG$RANG106 == 0, c(3:4)], x = rangeDOM) # x-fold cross-val
+  mod2.val # examine
+  threshold(mod2.val) # view maxent thresholds 
+```
+
+```{r}
+# generate confusion matrix; see help(theshold) for maxent threshold options
+#   here use spec_sens: highest sum of sens & spec
+  mod.cut <- threshold(mod2.val)
+  mod.cut # view maxent thresholds
+  mod2.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$mod2.pred >= mod.cut$spec_sens)))
+  mod2.cfmat
+```
+
+```{r}
+# calculate model accuracies with standard deviation=F
+  #library(PresenceAbsence) # PresenceAbsence for accuracy metrics
+  mod2.acc <- presence.absence.accuracy(dat2, threshold = mod.cut[[2]], st.dev = F)
+  tss <- mod2.acc$sensitivity + mod2.acc$specificity - 1 # code TSS metric
+  mod2.acc <- cbind(mod2.acc[1:7], tss) # bind all metrics
+  mod2.acc[c(1, 4:5, 7:8)] # examine accuracies
+```
+  
+```{r}
+######## START CROSS-VALIDATION METRICS FROM MAXENT
+# NOT RUN: simple xfold code
+  
+  # 10:00 timestamp 
+  
+  set.seed(1234) # set.seed for repeatability
+  tr_RANG.xf <- sample(rep(c(1:10), length = nrow(tr_RANG))) # vector of random xfolds
+  mod2.predXF <- rep(0, length = nrow(tr_RANG)) # empty vector of 0
+  xfold <- 5 # set No. xfolds
+# simple loop for xfold
+  for (i in 1:xfold) {
+    tr <- tr_RANG[tr_RANG.xf != i, ] # training not eq. i
+    te <- tr_RANG[tr_RANG.xf == i, ] # test eq. i
+    mx <- maxent(tr_RANG[5:11], tr_RANG[2], data = tr) # maxent model on training
+    mod2.predXF[tr_RANG.xf == i] <- predict(mx, te) # predict to test
+    }
+  head(mod2.predXF) # examine vector xfold prediction 
+```
+
+```{r}
+# generate confusion matrix; see help(theshold) for maxent threshold options
+#   here use spec_sens: highest sum of sens & spec
+  dat2XF <- cbind(modl, tr_RANG[2], mod2.predXF) # build dataframe w/mod1 predictions
+  head(dat2XF, 2) # examine prediction dataframe
+  mod.cutXF <- threshold(mod2.val)
+  mod.cut # view maxent thresholds
+  mod2.cfmatXF <- table(dat2XF[[2]], factor(as.numeric(dat2XF$mod2.predXF >= mod.cut$spec_sens)))
+  mod2.cfmatXF
+
+```
+
+```{r}
+# calculate model accuracies with standard deviation=F
+  #library(PresenceAbsence) # PresenceAbsence for accuracy metrics
+  mod2.accXF <- presence.absence.accuracy(dat2XF, threshold = mod.cut[[2]], st.dev = F)
+  tss <- mod2.accXF$sensitivity + mod2.accXF$specificity - 1 # code TSS metric
+  mod2.accXF <- cbind(mod2.accXF[1:7], tss) # bind all metrics - this had a typo in original code!
+######## END CROSS-VALIDATION METRICS FROM MAXENT
+```
+  
+```{r}
+#compare accuracies
+mod2.acc[c(1, 4:5, 7:8)] # resub
+mod2.accXF[c(1, 4:5, 7:8)] #cross-val
+```
+
+
+Overall fit does not look great; the TSS is really low, especially in cross-fold validation. Drops in most metrics when using cross-fold validation means the model is likely over-fit to the data. 
 
 ---
 
@@ -93,6 +221,38 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #4
+  
+```{r}
+# predict for final MAX model
+  mod2.MAXprob_RANG <- predict(mod2.MAX_RANG, rangeDOM) # predict entire model domain
+  writeRaster(mod2.MAXprob_RANG, filename = "mod2.MAXprob_RANG.img", format = "HFA")
+```
+
+```{r}
+# basic reclassify based on threshold mod.cut per above
+  mod2.MAXclas_RANG <- reclassify(mod2.MAXprob_RANG, c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1))
+  writeRaster(mod2.MAXclas_RANG, filename = "mod2.MAXclas_RANG.img", format = "HFA")
+```
+  
+```{r}
+######## START PROBABILITY & CLASSIFICATION PLOTS	 
+# boundaries for pretty maps (see Mod 2.5)
+  setwd(path.gis)
+  states <- st_read(dsn = ".", layer = "na_states_wgs") # import shapefile
+```
+  
+```{r}
+# giggle plots
+  par(mfrow = c(1, 2))
+  plot(mod2.MAXprob_RANG, legend = T, axes = T, main = "Probability Map") # plot clipped probability map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  plot(mod2.MAXclas_RANG, legend = F, axes = T, main = "Classification Map") # plot clipped classified map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5)  # add state boundaries
+  par(mfrow = c(1, 1))
+  
+  MAXmaps_EX09 <- recordPlot()
+```
+  
 
 ---
 
@@ -105,6 +265,22 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+setwd(path.mod5.3)
+
+# Accuracy metrics as a dataframe
+all.acc_EX09 <- bind_rows(mod2.acc, mod2.accXF)
+
+# Classification threshold as a stand--alone scalar
+mod.cut.EX09 <- mod.cut[[2]]
+
+#plot - also saved this manually
+MAXmaps_EX09
+
+save(all.acc_EX09, mod.cut.EX09, MAXmaps_EX09, file = "range.MAX_EX09.RData")
+```
+
 
 ---
 
