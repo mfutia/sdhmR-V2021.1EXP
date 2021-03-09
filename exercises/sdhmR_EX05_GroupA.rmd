@@ -169,6 +169,7 @@ These data will be used in the next exercise #6.
 range_data_shp <- st_as_sf(range_PPsA_ShortData, coords = c("tr.wgs_x", "tr.wgs_y"), crs = prj.wgs84, remove = F)
 
 setwd(path.mod2)
+save(rangeDOM, file = "rangeDOM.Rdata")
 save(range_PPsA_ShortData, range_data_shp, file = "range_pres_psu_data.Rdata")
 st_write(range_PPsA_ShortData, dsn = ".", layer = "range_data_shp", driver = "ESRI Shapefile", delete_layer = T, delete_dsn = T)
 ```

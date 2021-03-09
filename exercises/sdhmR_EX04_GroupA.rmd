@@ -66,6 +66,7 @@ range.bufptR = crop(rasterize(range.bufptSP, t1), range.bufptSP)
 ggplot()+
   geom_sf(data = range.bufSF, fill = "gray95")+
   geom_sf(data = range.bufptSF, fill = "gray80")+
+#  geom_raster(data = t1)+
   geom_point(data = range, aes(wgs_xF, wgs_yF), shape = 1, color = "darkgreen")+
   theme_classic()
 ```
@@ -109,14 +110,13 @@ names(tru.presFNET)[1] = "FNETID"
 ```
 
 ```{r}
-bufpt.fnetid = extract(range.bufptR, range.fnetDF[c("cell.wgs_x", "cell.wgs_y")])
+bufpt.fnetid = raster::extract(range.bufptR, range.fnetDF[c("cell.wgs_x", "cell.wgs_y")])
 tru.bufptFNET = cbind(range.fnetDF, bufpt.fnetid)
 
 length(tru.bufptFNET$bufpt.fnetid)               # 2246560
 ncell(range.bufR)                                # 2246560
 table(tru.bufptFNET$bufpt.fnetid)[[1]]           # 1095407
 length(which(is.na(tru.bufptFNET$bufpt.fnetid))) # 1151153
-
 
 plot(range.bufR, col = "gray95", legend = F)
 plot(range.bufptR, col = "gray80", legend = F, add = T)
@@ -130,7 +130,7 @@ range.indexFNET <- merge(m1, tru.presFNET, by = c("FNETID"), all = T)
 names(range.indexFNET)[4] <- "in.modFR"
 
 setwd(path.mod2)
-save(range.indexFNET, file = "range.indexFNET.RData")
+saveRDS(range.indexFNET, file = "range.indexFNET.rds")
 ```
 
 ```{r}
@@ -173,10 +173,10 @@ head(range.PPsA,2)
 
 ```{r}
 setwd(path.mod2)
-save("range.PPsA", "p2.spp", "p2.modFR", "psu.bufpt", file = "range_pres.psu.RData")
+save("range.PPsA", "p2.spp", "p2.modFR", "psu.bufpt", "range.bufptR", "range.bufR", file = "range_pres.psu.RData")
 st_write(range.bufptSF, dsn = ".", layer = "range.fnetSF", driver = "ESRI Shapefile",
     delete_layer = T, delete_dsn = T)
-writeRaster(range.bufptR, "RangeBufPt", format = "HFA")
+writeRaster(range.bufptR, "RangeBufPt", format = "HFA", overwrite = T)
 writeRaster(range.bufR, "RangeBuf", format = "HFA")
 ```
 

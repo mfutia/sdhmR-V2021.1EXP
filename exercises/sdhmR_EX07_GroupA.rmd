@@ -63,12 +63,15 @@ library(tidyverse)
 library(data.table)
 library(PresenceAbsence) # PresenceAbsence for accuracy metrics
 library(DAAG)
+library(raster)
+library(sf)
 
 # Set working directories
 path.root <- "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP"
 path.mod2 <- paste(path.root, "/data/module02", sep = "")
 path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
 path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+path.range <- paste(path.root, "/data/RangeData", sep = "")
 
 # Load CRSs
 setwd(path.root)
@@ -114,7 +117,11 @@ ggplot(tr_RANG)+
 **Full-variable logistic GLM**
 ```{r}
 colnames(range_PPsA_ShortData[,18:33])
-FullRange <- glm(RANG106 ~ etpt_5+etpt_6+etpt_sprin+exp1nrm+exp3nrm+exp5nrm+mind_yr_av+prad_sw_di+prec_w_hal+prec_winte+rough_1k+tave_s_hal+tave_sprin+tmax_s_hal+tmax_summe+topos, family = binomial, data = range_PPsA_ShortData)
+cn <- c(colnames(range_PPsA_ShortData[,1:17]) ,paste(names(range_PPsA_ShortData[,18:33]),".img", sep = ""))
+
+colnames(range_PPsA_ShortData) <- cn
+
+FullRange <- glm(RANG106 ~ etpt_5.img+etpt_6.img+etpt_sprin.img+exp1nrm.img+exp3nrm.img+exp5nrm.img+mind_yr_av.img+prad_sw_di.img+prec_w_hal.img+prec_winte.img+rough_1k.img+tave_s_hal.img+tave_sprin.img+tmax_s_hal.img+tmax_summe.img+topos.img, family = binomial, data = range_PPsA_ShortData)
 summary(FullRange)
 
 FullRange.fit <- 100 * (1 - FullRange$deviance/FullRange$null.deviance)
@@ -169,16 +176,17 @@ auc.roc.plot(dat2, color = T)
 
 **Accuracy with 10-fold Cross Validation**
 ```{r}
+set.seed(1234)
 PartRange.cv <- CVbinary(PartRange, nfolds = 10, print.details = F)
 PartRange.cv <- PartRange.cv$cvhat
-dat2 <- cbind(dat2, PartRange.cv)
+dat2 <- cbind(dat2[,1:2], PartRange.cv)
 head(dat2)
 
 # generate confusion matrix
 PartRange.cfmatJ <- table(dat2[[2]], factor(as.numeric(dat2$PartRange.cv >= mod.cut$PartRange.pred)))
 PartRange.cfmatJ
 
-# calculate model accuracies with standard deviation=F
+# calculate model accuracy with standard deviation=F
 PartRange.accB <- presence.absence.accuracy(dat2, threshold = mod.cut$PartRange.pred, st.dev = F)
 tss <- PartRange.accB$sensitivity + PartRange.accB$specificity - 1
 PartRange.accB <- cbind(PartRange.accB[1:7], tss)
@@ -199,15 +207,21 @@ setwd(path.mod2)
 load("rangeDOM.RData") 
 rang.probLR <- predict(rangeDOM,FullRange,filename="FullRange.probLR.img",type="response",fun=predict,index=2, overwrite=TRUE)
 rang.probLR
+
+setwd(path.gis)
+states <- st_read(dsn = ".", layer = "na_states_wgs")
+
+plot(rang.probLR, legend = T, axes = T, main = "Probability Map")
+plot(st_geometry(states), add = T, lwd = 1.5)
 ```
 
-**Classidfied Map**
+**Classified Map**
 ```{r classified map data}
 rang.clasLR <- reclassify(rang.probLR, filename = "range.clas.LR.img", 
    (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)), overwrite=TRUE)
 
-```
-
+plot(rang.clasLR, legend = T, axes = T, main = "Classification Map")
+plot(st_geometry(states), add = T, lwd = 1.5)
 ```
 
 ---
@@ -221,6 +235,20 @@ rang.clasLR <- reclassify(rang.probLR, filename = "range.clas.LR.img",
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+setwd(path.range)
+
+# Accuracy metrics as a dataframe
+all.acc_Reduced <- rbind(PartRange.acc, PartRange.accB)
+
+# Classification threshold as a stand--alone scalar
+mod.cut_50 <- mod.cut[[2]]
+
+#plots saved this manually
+
+save(FullRange, PartRange, all.acc_Reduced, mod.cut_50, file = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/RangeData/GLM_Results.Rdata")
+```
 
 ---
 

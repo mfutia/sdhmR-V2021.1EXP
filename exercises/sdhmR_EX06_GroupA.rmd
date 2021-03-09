@@ -164,6 +164,11 @@ tr_RANG_SF <- st_as_sf(tr_RANG, coords = c("tr.wgs_x", "tr.wgs_y"), crs = prj.wg
 setwd(path.mod2)
 save(tr_RANG, tr_RANG_SF, file = "tr_RANG.Rdata")
 st_write(tr_RANG, dsn = ".", layer = "tr_RANG_SF", driver = "ESRI Shapefile", delete_layer = T, delete_dsn = T)
+
+load("tr_RANG.Rdata")
+test = tr_RANG[,16:24]
+test2 = na.omit(test)
+colnames(test2)
 ```
 
 ---
