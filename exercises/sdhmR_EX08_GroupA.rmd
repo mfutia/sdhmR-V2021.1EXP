@@ -1,19 +1,12 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 8 Group A"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
@@ -67,13 +60,48 @@ Remember, you will have been assigned data for *edulis* having one the following
 
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# Load packages
+library(tidyverse)
+library(data.table)
+library(PresenceAbsence) # PresenceAbsence for accuracy metrics
+library(DAAG)
+library(gam)             # smoothers with "s()" or LOWESS: "lo()"s
+library(car)
+library(raster)
+library(sf)
+
+# Set working directories
+path.root <- "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP"
+path.mod2 <- paste(path.root, "/data/module02", sep = "")
+path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+path.range <- paste(path.root, "/data/RangeData", sep = "")
+
+# Load CRSs
+setwd(path.root)
+source("r_code/prjs4_sdhmR.r")
+ls(pattern = "prj.")
+
+# Load presence:pseudo-absence and predictor data
+load(paste(path.mod2, "/range_pres_psu_data.RData", sep = ""))
+load(paste(path.mod2, "/tr_RANG.Rdata", sep = ""))
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+tr_RANG_long <- tr_RANG %>% 
+  pivot_longer(etpt_5:topos, names_to = "Variable", values_to = "Value") 
+head(tr_RANG_long, 3)
+
+#summarise data 
+tr_RANG_long %>% group_by(Variable) %>% 
+  summarise(n = n(),
+            mean = mean(Value), 
+            sd = sd(Value), 
+            min = min(Value), 
+            max = max(Value))
+
+# see plots from ex 7
+```
 
 ---
 
@@ -82,12 +110,72 @@ If King's English interpretation is required, it will go here, after each code c
 * Construct some basic plots to assess possible relationships warranting use of a GAM
 * List which variables may be amenable to a GAM--based smoother
 
+```{r}
+# make scatter plots of variables (look for non-linearity)
+plot(tr_RANG[18:24])
+
+### make plots to identify response heterogeneity
+## width of bins = data density
+# par(mfcol = c(1, 3)) # if desired
+col.list <- c("grey80", "forestgreen") # specified color ramp
+
+plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$etpt_5, xlab = "etpt_5", ylab = "Presence category", col = col.list) # plot 1: etpt_5
+
+plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$mind_yr_av, xlab = "mind_yr_av", ylab = "Presence category", col = col.list) # plot 2: mind_yr_av
+
+plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$prad_sw_di, xlab = "prad_sw_di", ylab = "Presence category", col = col.list) # plot 3: prad_sw_di
+
+plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$prec_w_hal, xlab = "prec_w_hal", ylab = "Presence category", col = col.list) # plot 4: prec_w_hal
+
+plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$rough_1k, xlab = "rough_1k", ylab = "Presence category", col = col.list) # plot 5: rough_1k
+
+plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$tmax_s_hal, xlab = "tmax_s_hal", ylab = "Presence category", col = col.list) # plot 6: tmax_s_hal
+
+plot(as.factor(tr_RANG$RANG106) ~ tr_RANG$topos, xlab = "topos", ylab = "Presence category", col = col.list) # plot 7: topos
+# par(mfrow = c(1, 1))
+
+```
+*Variables mind_yr_av, prec_w_hal, and tmax_s_hal would be most likely to need a GAM smoother. The remaining variables other than et_pt5 may all benefit from smoothers too*
+
 ---
 
 ## Question #3
 
 * Construct a set of GAMs from fully linear to a maximum of 5 splines
   * Use lowess smoother rather than default spline
+
+```{r}
+# fully linear GAM
+colnames(tr_RANG)
+cn <- c(colnames(tr_RANG[,1:17]) ,paste(names(tr_RANG[,18:24]),".img", sep = ""))
+
+colnames(tr_RANG) <- cn
+
+PartRange_GAM <- gam(RANG106 ~ etpt_5.img+mind_yr_av.img+prad_sw_di.img+prec_w_hal.img+rough_1k.img+tmax_s_hal.img+topos.img, family = "binomial", data = tr_RANG) 
+summary(PartRange_GAM)
+
+# Mixed linear and smoothed model
+PartRange_GAM2 <- gam(RANG106 ~ etpt_5.img+lo(mind_yr_av.img)+lo(prad_sw_di.img)+lo(prec_w_hal.img)+lo(rough_1k.img)+lo(tmax_s_hal.img)+lo(topos.img), family = "binomial", data = tr_RANG) 
+summary.Gam(PartRange_GAM2)
+
+# Stepwise GLM
+PartRange_GAM3 <- step.Gam(PartRange_GAM,scope=list(
+    "etpt_5.img" = ~1 + etpt_5.img + lo(etpt_5.img, 0.33) + lo(etpt_5.img, 0.2),
+    "mind_yr_av.img" = ~1 + mind_yr_av.img + lo(mind_yr_av.img, 0.33) + lo(mind_yr_av.img, 0.2),
+    "prad_sw_di.img" = ~1 + prad_sw_di.img + lo(prad_sw_di.img, 0.33) + lo(prad_sw_di.img, 0.2),
+    "prec_w_hal.img" = ~1 + prec_w_hal.img + lo(prec_w_hal.img, 0.33) + lo(prec_w_hal.img, 0.2),
+    "rough_1k.img" = ~1 + rough_1k.img + lo(rough_1k.img, 0.33) + lo(rough_1k.img, 0.2),
+    "tmax_s_hal.img" = ~ 1 + tmax_s_hal.img + lo(tmax_s_hal.img, 0.33) + lo(tmax_s_hal.img, 0.2),
+    "topos.img" = ~1 + topos.img + lo(topos.img, 0.33) + lo(topos.img, 0.2)), trace = F)
+summary(PartRange_GAM3)
+```
+
+```{r}
+PartRange_GAM2.fit <- 100 * (1 - PartRange_GAM2$deviance/PartRange_GAM2$null.deviance)
+PartRange_GAM2.fit # 24.0 (up from full GLM)
+PartRange_GAM2$deviance # 5,803.7 (down from full GLM)
+PartRange_GAM2.pred <- predict(PartRange_GAM2, type = "response")
+```
 
 ---
 
@@ -97,6 +185,50 @@ If King's English interpretation is required, it will go here, after each code c
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
 
+**Accuracy with Resubstitution**
+```{r}
+mod2 <- "GAM2"
+dat2 <- cbind(mod2, tr_RANG[2], PartRange_GAM2.pred)
+head(dat2, 2)
+
+mod.cut <- optimal.thresholds(dat2, opt.methods = c("Default"))
+mod.cut
+
+# generate confusion matrix
+PartRange_GAM2.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$PartRange_GAM2.pred >= mod.cut$PartRange_GAM2.pred)))
+PartRange_GAM2.cfmat
+
+# calculate model accuracies with standard deviation=F
+PartRange_GAM2.acc <- presence.absence.accuracy(dat2, threshold = mod.cut$PartRange_GAM2.pred, st.dev = F)
+tss <- PartRange_GAM2.acc$sensitivity + PartRange_GAM2.acc$specificity - 1
+PartRange_GAM2.acc <- cbind(PartRange_GAM2.acc[1:7], tss)
+PartRange_GAM2.acc[c(1, 4:5, 7:8)]
+
+auc.roc.plot(dat2, color = T)
+```
+
+**Accuracy with 10-fold Cross Validation**
+```{r}
+set.seed(1234)
+PartRange_GAM2.cv <- CVbinary(PartRange_GAM2, nfolds = 10, print.details = F)
+PartRange_GAM2.cv <- PartRange_GAM2.cv$cvhat
+dat2 <- cbind(dat2[,1:2], PartRange_GAM2.cv)
+head(dat2)
+
+# generate confusion matrix
+PartRange_GAM2.cfmatJ <- table(dat2[[2]], factor(as.numeric(dat2$PartRange_GAM2.cv >= mod.cut$PartRange_GAM2.pred)))
+PartRange_GAM2.cfmatJ
+
+# calculate model accuracy with standard deviation=F
+PartRange_GAM2.accB <- presence.absence.accuracy(dat2, threshold = mod.cut$PartRange_GAM2.pred, st.dev = F)
+tss <- PartRange_GAM2.accB$sensitivity + PartRange_GAM2.accB$specificity - 1
+PartRange_GAM2.accB <- cbind(PartRange_GAM2.accB[1:7], tss)
+PartRange_GAM2.accB[c(1, 4:5, 7:8)]
+
+GAM2_acc.sum = rbind(PartRange.acc, PartRange.accB)
+```
+
+
 ---
 
 ## Question #5
@@ -104,6 +236,28 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #4
+
+```{r}
+rang.probGAM <- predict(rangeDOM,PartRange_GAM2,filename="PartRange.probGAM.img",type="response",fun=predict,index=2, overwrite=TRUE)
+rang.probGAM
+
+setwd(path.gis)
+states <- st_read(dsn = ".", layer = "na_states_wgs")
+
+plot(rang.probGAM, legend = T, axes = T, main = "Probability Map")
+plot(st_geometry(states), add = T, lwd = 1.5)
+```
+
+**Classified Map**
+```{r classified map data}
+rang.clasGAM <- reclassify(rang.probGAM, filename = "range.clas.GAM.img", 
+   (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)), overwrite=TRUE)
+
+plot(rang.probGAM, legend = T, axes = T, main = "Classification Map")
+plot(st_geometry(states), add = T, lwd = 1.5)
+```
+
+
 
 ---
 
@@ -116,6 +270,12 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+mod.cut_GAM <- mod.cut$PartRange_GAM2.pred
+
+save(PartRange_GAM, PartRange_GAM2, GAM2_acc.sum, mod.cut_GAM, rang.probGAM, rang.clasGAM, file = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/RangeData/GAM_Results.Rdata")
+```
 
 ---
 
