@@ -1,0 +1,169 @@
+---
+title: "Exercise Title Goes Here"
+author: "Eli POlzer"
+date: "10 March 2021" March 
+output: html_document
+---
+---
+## Question #1
+
+* Import and explore data
+  * **NOTE**:  intent is not to reduce number of variables; that was completed in exercise #5.  Rather, calculate simple descriptive statistics (mean, sd, n) and boxplots
+
+```{r}
+path.root <- "C:/Users/epolzer/Documents/sdhmR-V2021.1"
+  path.mod2 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module02", sep = "")
+  path.mod7 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module05.03-MAX", sep = "")
+  path.figs <- paste(path.root, "/sdhmR-V2021.1EXP/Figures", sep = "")
+  path.prj <- paste(path.root, "/sdhmR-V2021.1EXP/R_Code", sep = "")
+  path.gis <- paste(path.root, "/sdhmR-V2021.1EXP/Data/gis_layers", sep = "")
+
+  library(dismo)
+  library(raster)
+  library(PresenceAbsence)
+  library(maptools)
+  options("rgdal_show_exportToProj4_warnings"="none")
+  library(rgdal)
+```
+
+```{r}
+  setwd(path.mod2)
+  dat1.p <- get(load("pied.tr.joint.RData"))
+  head(dat1.p)
+  dat1.px <- dplyr::select(dat1.p, -c('FNETID', 'etpt_6.img', 'etpt_sprin.img', 'exp3nrm.img', 'exp5nrm.img', 'prec_winte.img', 'tave_s_hal.img', 'tave_sprin.img', 'tmax_summe.img', 'topos.img'))
+  head(dat1.px, 2)
+  dim(dat1.px)
+  table(dat1.px$RANG106)
+  class(dat1.px$RANG106)
+  
+  aggregate(dat1.px [, 4:10], list(presabs = dat1.px$RANG106), FUN = mean, na.rm = T)
+  aggregate(dat1.px [, 4:10], list(presabs = dat1.px$RANG106), FUN = median, na.rm = T) 
+
+  par(mfrow = c(1,boxplot(dat1.px$etpt_5.img ~ dat1.px$RANG106,xlab = "Presence:Absence", ylab = "ETPT5")))
+  par(mfrow = c(1,boxplot(dat1.px$exp1nrm.img ~ dat1.px$RANG106,xlab = "Presence:Absence", ylab = "EXP1")))
+  par(mfrow = c(1,boxplot(dat1.px$mind_yr_av.img ~ dat1.px$RANG106,xlab = "Presence:Absence", ylab = "MIND")))
+  par(mfrow = c(1,boxplot(dat1.px$prad_sw_di.img ~ dat1.px$RANG106,xlab = "Presence:Absence", ylab = "PRAD")))
+  par(mfrow = c(1,boxplot(dat1.px$prec_w_hal.img ~ dat1.px$RANG106,xlab = "Presence:Absence", ylab = "PRECHAL")))
+  par(mfrow = c(1,boxplot(dat1.px$rough_1k.img ~ dat1.px$RANG106,xlab = "Presence:Absence", ylab = "ROUGH")))
+  par(mfrow = c(1,boxplot(dat1.px$tmax_s_hal.img ~ dat1.px$RANG106,xlab = "Presence:Absence", ylab = "TMAXHAL")))
+```
+
+---
+## Question #2
+
+* Construct a MAXENT model using the presence:absence data
+* Build plots of variable importance values
+```{r}
+ library(dismo)
+  Sys.setenv(JAVA_HOME='C:\\Program Files\\Java\\jre1.8.0_144') 
+  mod1.MAX <- maxent(dat1.px[4:10], dat1.px[1]) 
+  mod1.MAX
+
+  plot(mod1.MAX) # var importance plot
+
+  response(mod1.MAX) # prediction vs. var plot
+```
+
+---
+## Question #3
+
+* Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
+  * Resubstitution approaches, and
+  * A 10-fold cross--validation approach
+```{r}
+  # RE-SUBSTITUTION:
+  mod1.pred <- predict(mod1.MAX, dat1.px[4:10])
+  modl <- "mod1.MAX"
+  dat2 <- cbind(modl, dat1.px[1], mod1.pred)
+  head(dat2)
+  nrow(dat2)
+  dim(dat2)
+  
+  setwd(path.mod2)
+  load("pied.topoDOM.RData")
+
+  mod1.eval <- evaluate(mod1.MAX, p = dat1.px[dat1.px$RANG106 == 1, c(2:3)], 
+                       a = dat1.px[dat1.px$RANG106 == 0, c(2:3)], x = pied.topoDOM)
+  mod1.eval
+  threshold(mod1.eval) 
+
+  mod.cut <- threshold(mod1.eval)
+  mod.cut
+  mod2.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$mod1.pred >= mod.cut$spec_sens)))
+  mod2.cfmat
+
+  mod1.acc <- presence.absence.accuracy(dat2, threshold = mod.cut[[3]], st.dev = F)
+  head(mod1.acc, 2)
+  tss <- mod1.acc$sensitivity + mod1.acc$specificity - 1
+  mod1.acc <- cbind(mod1.acc[1:7], tss)
+  mod1.acc[c(1, 4:5, 7:8)]
+  mod1.acc[c(3)]
+  
+  auc.roc.plot(dat2, color = T)
+  
+  # CROSS-VALIDATION:
+  set.seed(1234)
+  tr_RANG.xf <- sample(rep(c(1:10), length = nrow(dat1.px)))
+  mod1.predXF <- rep(0, length = nrow(dat1.px))
+  xfold <- 10
+
+  for (i in 1:xfold) {
+    tr <- dat1.px[tr_RANG.xf != i, ]
+    te <- dat1.px[tr_RANG.xf == i, ]
+    mx <- maxent(dat1.px[4:10], dat1.px[1], data = tr)
+    mod1.predXF[tr_RANG.xf == i] <- predict(mx, te)
+  }
+  head(mod1.predXF, 2)
+
+  dat2XF <- cbind(modl, dat1.px[3], mod1.predXF)
+  head(dat2XF, 2)
+  mod.cutXF <- threshold(mod1.eval)
+  mod.cut 
+  mod2.cfmatXF <- table(dat2XF[[2]], factor(as.numeric(dat2XF$mod1.predXF >= mod.cut$spec_sens)))
+  mod2.cfmatXF
+
+  mod1.accXF <- presence.absence.accuracy(dat2XF, threshold = mod.cut[[2]], st.dev = F)
+  tss <- mod1.accXF$sensitivity + mod1.accXF$specificity - 1
+  mod1.accXF <- cbind(mod1.acc[1:7], tss)
+  mod1.accXF[c(1, 4:5, 7:8)]
+```
+
+---
+## Question #4
+
+* Build 2 prediction maps:
+  * A raw probability estimate for each cell in the modelling domain; and
+  * A classified map based on the selected threshold from Question #4
+```{r}
+  states <- st_read(dsn = ".", layer = "na_states_wgs")
+  
+  par(mfrow = c(1, 2))
+  plot(mod1.MAXprob, legend = T, axes = T, main = "Probability Map")
+  plot(sf::st_geometry(states), add = T, lwd = 1.5)
+  plot(mod1.MAXclas, legend = F, axes = T, main = "Classification Map") 
+  plot(sf::st_geometry(states), add = T, lwd = 1.5)
+  par(mfrow = c(1, 1))
+```
+
+---
+## Question #5
+
+* Save your data as R objects:
+  * Accuracy metrics as a dataframe;
+  * Classification threshold as a stand--alone scalar
+  * Both prediction maps as **`.img`** format
+* Save these R objects in a **`.RData`** file
+
+These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+  setwd(path.mod7)
+  all.acc_HW9 <- cbind(mod1.acc, mod1.accXF)
+  mod.cut_HW9 <- mod.cut[[2]]
+  mod1.MAXmaps_HW9
+  save(all.acc_HW9, mod.cut_HW9, mod1.MAXmaps_HW9, file = "MAX_HW9.RData")
+```
+
+## The End
+
+---
