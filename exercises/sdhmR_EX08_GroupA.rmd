@@ -85,6 +85,7 @@ ls(pattern = "prj.")
 # Load presence:pseudo-absence and predictor data
 load(paste(path.mod2, "/range_pres_psu_data.RData", sep = ""))
 load(paste(path.mod2, "/tr_RANG.Rdata", sep = ""))
+load(paste(path.mod2,"/rangeDOM.RData", sep = "")) 
 ```
 
 ```{r}
@@ -154,26 +155,26 @@ colnames(tr_RANG) <- cn
 PartRange_GAM <- gam(RANG106 ~ etpt_5.img+mind_yr_av.img+prad_sw_di.img+prec_w_hal.img+rough_1k.img+tmax_s_hal.img+topos.img, family = "binomial", data = tr_RANG) 
 summary(PartRange_GAM)
 
-# Mixed linear and smoothed model
-PartRange_GAM2 <- gam(RANG106 ~ etpt_5.img+lo(mind_yr_av.img)+lo(prad_sw_di.img)+lo(prec_w_hal.img)+lo(rough_1k.img)+lo(tmax_s_hal.img)+lo(topos.img), family = "binomial", data = tr_RANG) 
+## Mixed linear and smoothed model
+# PartRange_GAM2 <- (RANG106 ~ etpt_5.img+lo(mind_yr_av.img)+lo(prad_sw_di.img)+lo(prec_w_hal.img)+lo(rough_1k.img)+lo(tmax_s_hal.img)+lo(topos.img), family = "binomial", data = tr_RANG) 
 summary.Gam(PartRange_GAM2)
 
 # Stepwise GLM
-PartRange_GAM3 <- step.Gam(PartRange_GAM,scope=list(
-    "etpt_5.img" = ~1 + etpt_5.img + lo(etpt_5.img, 0.33) + lo(etpt_5.img, 0.2),
-    "mind_yr_av.img" = ~1 + mind_yr_av.img + lo(mind_yr_av.img, 0.33) + lo(mind_yr_av.img, 0.2),
-    "prad_sw_di.img" = ~1 + prad_sw_di.img + lo(prad_sw_di.img, 0.33) + lo(prad_sw_di.img, 0.2),
-    "prec_w_hal.img" = ~1 + prec_w_hal.img + lo(prec_w_hal.img, 0.33) + lo(prec_w_hal.img, 0.2),
-    "rough_1k.img" = ~1 + rough_1k.img + lo(rough_1k.img, 0.33) + lo(rough_1k.img, 0.2),
-    "tmax_s_hal.img" = ~ 1 + tmax_s_hal.img + lo(tmax_s_hal.img, 0.33) + lo(tmax_s_hal.img, 0.2),
-    "topos.img" = ~1 + topos.img + lo(topos.img, 0.33) + lo(topos.img, 0.2)), trace = F)
-summary(PartRange_GAM3)
+PartRange_GAM2 <- step.Gam(PartRange_GAM,scope=list(
+    "etpt_5.img" = ~1 + etpt_5.img + s(etpt_5.img, 3) + s(etpt_5.img, 5),
+    "mind_yr_av.img" = ~1 + mind_yr_av.img + s(mind_yr_av.img, 3) + s(mind_yr_av.img, 5),
+    "prad_sw_di.img" = ~1 + prad_sw_di.img + s(prad_sw_di.img, 3) + s(prad_sw_di.img, 5),
+    "prec_w_hal.img" = ~1 + prec_w_hal.img + s(prec_w_hal.img, 3) + s(prec_w_hal.img, 5),
+    "rough_1k.img" = ~1 + rough_1k.img + s(rough_1k.img, 3) + s(rough_1k.img, 5),
+    "tmax_s_hal.img" = ~ 1 + tmax_s_hal.img + s(tmax_s_hal.img, 3) + s(tmax_s_hal.img, 5),
+    "topos.img" = ~1 + topos.img + s(topos.img, 3) + s(topos.img, 5)), trace = F)
+summary(PartRange_GAM2)
 ```
 
 ```{r}
 PartRange_GAM2.fit <- 100 * (1 - PartRange_GAM2$deviance/PartRange_GAM2$null.deviance)
-PartRange_GAM2.fit # 24.0 (up from full GLM)
-PartRange_GAM2$deviance # 5,803.7 (down from full GLM)
+PartRange_GAM2.fit # 24.4 (up from full GLM)
+PartRange_GAM2$deviance # 5,769.3 (down from full GLM)
 PartRange_GAM2.pred <- predict(PartRange_GAM2, type = "response")
 ```
 
@@ -225,7 +226,7 @@ tss <- PartRange_GAM2.accB$sensitivity + PartRange_GAM2.accB$specificity - 1
 PartRange_GAM2.accB <- cbind(PartRange_GAM2.accB[1:7], tss)
 PartRange_GAM2.accB[c(1, 4:5, 7:8)]
 
-GAM2_acc.sum = rbind(PartRange.acc, PartRange.accB)
+GAM2_acc.sum = rbind(PartRange_GAM2.acc, PartRange_GAM2.accB)
 ```
 
 
@@ -237,6 +238,7 @@ GAM2_acc.sum = rbind(PartRange.acc, PartRange.accB)
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #4
 
+**Probability Map**
 ```{r}
 rang.probGAM <- predict(rangeDOM,PartRange_GAM2,filename="PartRange.probGAM.img",type="response",fun=predict,index=2, overwrite=TRUE)
 rang.probGAM
@@ -248,16 +250,14 @@ plot(rang.probGAM, legend = T, axes = T, main = "Probability Map")
 plot(st_geometry(states), add = T, lwd = 1.5)
 ```
 
-**Classified Map**
+**Classification Map**
 ```{r classified map data}
 rang.clasGAM <- reclassify(rang.probGAM, filename = "range.clas.GAM.img", 
    (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)), overwrite=TRUE)
 
-plot(rang.probGAM, legend = T, axes = T, main = "Classification Map")
+plot(rang.clasGAM, legend = T, axes = T, main = "Classification Map")
 plot(st_geometry(states), add = T, lwd = 1.5)
 ```
-
-
 
 ---
 
@@ -275,6 +275,8 @@ These data will be used again in Module 10, Ensemble Models.
 mod.cut_GAM <- mod.cut$PartRange_GAM2.pred
 
 save(PartRange_GAM, PartRange_GAM2, GAM2_acc.sum, mod.cut_GAM, rang.probGAM, rang.clasGAM, file = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/RangeData/GAM_Results.Rdata")
+
+# load(file = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/RangeData/GAM_Results.Rdata")
 ```
 
 ---

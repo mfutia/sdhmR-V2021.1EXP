@@ -1,58 +1,43 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 9 Group A"
+author: "Eli, Mia, and Matt"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r include=F}
+# Load packages
+library(tidyverse)
+library(data.table)
+library(dismo)           # needed for kfold and maxent
+library(raster)
+library(PresenceAbsence)
+library(maptools)
+options("rgdal_show_exportToProj4_warnings"="none") # run this before library(rgdal)
+library(rgdal)
 
-## This exercise links to Module 5.3
+# Set working directories
+path.root <- "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP"
+path.mod2 <- paste(path.root, "/data/module02", sep = "")
+path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+path.range <- paste(path.root, "/data/RangeData", sep = "")
 
-Submit the completed exercise to us at:
+# Load CRSs
+setwd(path.root)
+source("r_code/prjs4_sdhmR.r")
+ls(pattern = "prj.")
 
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to:
-* Produce and interpret variable importance plots
-* Build a table of accuracy metrics, and AUC plot
-* Plot map products of the:
-  * (i) probability; and 
-  * (ii) classified distribution model
-  * (Save these two maps as **`.img`** files for use later in the course)
-
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
-
-## The Data
-
-* The dataframe completed in exercise #6.
+# Load presence:pseudo-absence and predictor data
+load(paste(path.mod2, "/range_pres_psu_data.RData", sep = ""))
+load(paste(path.mod2, "/tr_RANG.Rdata", sep = ""))
+load(paste(path.mod2,"/rangeDOM.RData", sep = "")) 
+```
 
 ---
 
@@ -61,15 +46,7 @@ Remember, you will have been assigned data for *edulis* having one the following
 * Import and explore data
   * **NOTE**:  intent is not to reduce number of variables; that was completed in exercise #5.  Rather, calculate simple descriptive statistics (mean, sd, n) and boxplots
 
-
-```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
-```
-
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+**Already done for exercise 7 & 8**
 
 ---
 
@@ -77,6 +54,27 @@ If King's English interpretation is required, it will go here, after each code c
 
 * Construct a MAXENT model using the presence:absence data
 * Build plots of variable importance values
+```{r}
+r_dat <- tr_RANG[,c(1,2,16:24)]
+r_dat <- na.omit(r_dat)
+
+cn <- c(colnames(r_dat[,1:4]) ,paste(names(r_dat[,5:11]),".img", sep = ""))
+colnames(r_dat) <- cn
+
+r_dom <- subset(rangeDOM, cn[5:11])
+
+mod1.MAX <- maxent(r_dat[5:11], r_dat[2])  # call for true pres:abs 
+```
+
+```{r}
+# plot variable importance values
+plot(mod1.MAX)
+```
+
+```{r}
+# plot variable response
+response(mod1.MAX)
+```
 
 ---
 
@@ -85,6 +83,103 @@ If King's English interpretation is required, it will go here, after each code c
 * Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
+  
+**Accuracy with Resubstitution**
+```{r}
+mod1.pred <- predict(mod1.MAX, r_dat[5:11]) # maxent prediction
+
+mod1 <- "MAXENT"
+dat1 <- cbind(mod1, r_dat[2], mod1.pred)
+head(dat1, 2)
+
+mod.cut <- optimal.thresholds(dat1, opt.methods = c("Default"))
+mod.cut
+
+# generate confusion matrix
+mod1_resub.cfmat <- table(dat1[[2]], factor(as.numeric(dat1$mod1.pred >= mod.cut$mod1.pred)))
+mod1_resub.cfmat
+
+# calculate model accuracies with standard deviation=F
+mod1_resub.acc <- presence.absence.accuracy(dat1, threshold = mod.cut$mod1.pred, st.dev = F)
+tss <- mod1_resub.acc$sensitivity + mod1_resub.acc$specificity - 1
+mod1_resub.acc <- cbind(mod1_resub.acc[1:7], tss)
+mod1_resub.acc[c(1, 4:5, 7:8)]
+
+auc.roc.plot(dat1, color = T)
+```
+
+**Accuracy with 10-fold Cross Validation**
+```{r}
+# simple xfold code
+set.seed(1234) # set.seed for repeatability
+r_dat.xf <- sample(rep(c(1:10), length = nrow(r_dat))) # vector of random xfolds
+mod1.predXF <- rep(0, length = nrow(r_dat)) # empty vector of 0
+xfold <- 10 # set No. xfolds
+# simple loop for xfold
+for (i in 1:xfold) {
+  tr <- r_dat[r_dat.xf != i, ] # training not eq. i
+  te <- r_dat[r_dat.xf == i, ] # test eq. i
+  mx <- maxent(r_dat[5:11], r_dat[2], data = tr) # maxent model on training
+  mod1.predXF[r_dat.xf == i] <- predict(mx, te) # predict to test
+}
+head(mod1.predXF) # examine vector xfold prediction 
+
+# evaluate model (an x-fold process: see help(evaluate))
+mod1.val <- evaluate(mod1.MAX, 
+                     p = r_dat[r_dat$RANG106 == 1, c(3:4)],
+                     a = r_dat[r_dat$RANG106 == 0, c(3:4)],
+                     x = r_dom) # x-fold cross-val
+mod1.val # examine
+threshold(mod1.val) # view maxent thresholds 
+
+# generate confusion matrix; see help(theshold) for maxent threshold options
+modl = "mod1_MAXENT"
+r_dat.XF <- cbind(modl, r_dat[2], mod1.predXF) # build dataframe w/mod1 predictions
+head(r_dat.XF, 2) # examine prediction dataframe
+mod_cutXF <- threshold(mod1.val)
+mod_cutXF # view maxent thresholds
+r_dat_cfmatXF <- table(r_dat.XF[[2]], factor(as.numeric(r_dat.XF$mod1.predXF >= mod_cutXF$spec_sens)))
+r_dat_cfmatXF
+
+# calculate model accuracies with standard deviation=F
+mod1.accXF <- presence.absence.accuracy(r_dat.xf, threshold = mod_cutXF[[2]], st.dev = F)
+tss <- mod1.accXF$sensitivity + mod1.accXF$specificity - 1 # code TSS metric
+mod1.accXF <- cbind(mod1.acc[1:7], tss) # bind all metrics
+mod1.accXF[c(1, 4:5, 7:8)] # examine accuracies 
+  
+# bind accuracies
+total_acc <- rbind(mod1_resub.acc,mod1.accXF)
+total_acc
+```
+
+```{r}
+# # prediction and validation
+# modl <- "mod1.MAX" # var placeholder
+# dat2 <- cbind(modl, r_dat[2], mod1.pred) # build dataframe w/mod1 predictions
+# head(dat2) # examine prediction dataframe
+# 
+# # evaluate model (an x-fold process: see help(evaluate))
+# mod1_val <- evaluate(mod1.MAX, p = r_dat[r_dat$RANG106 == 1, c(3:4)], 
+#   a = r_dat[r_dat$RANG106 == 0, c(3:4)], x = r_dom) # x-fold cross-val
+# mod1_val # examine
+# threshold(mod1_val) # view maxent thresholds 
+# 
+# # generate confusion matrix; see help(theshold) for maxent threshold options
+# #   here use spec_sens: highest sum of sens & spec
+# mod_cut <- threshold(mod1_val)
+# mod_cut # view maxent thresholds
+# mod1_cross.cfmat <- table(dat2[[2]], factor(as.numeric(dat2$mod1.pred >= mod_cut$spec_sens)))
+# mod1_cross.cfmat
+# 
+# # calculate model accuracies with standard deviation=F
+# mod1_cross.acc <- presence.absence.accuracy(dat2, threshold = mod_cut[[2]], st.dev = F)
+# tss <- mod1_cross.acc$sensitivity + mod1_cross.acc$specificity - 1 # code TSS metric
+# mod1_cross.acc <- cbind(mod1_cross.acc[1:7], tss) # bind all metrics
+# mod1_cross.acc[c(1, 4:5, 7:8)] # examine accuracies
+# 
+# # plotting AUC
+# auc.roc.plot(dat2, color = T) # basic AUC plot; pkg PresenceAbsence
+```
 
 ---
 
@@ -93,6 +188,33 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #4
+
+**Probability Map**
+```{r}
+rang_probMAX <- predict(r_dom,mod1.MAX,
+                        filename="PartRange.probMAXENT.img",
+                        type="response",
+                        fun=predict,index=2,
+                        overwrite=TRUE)
+rang_probMAX
+
+setwd(path.gis)
+states <- st_read(dsn = ".", layer = "na_states_wgs")
+
+plot(rang_probMAX, legend = T, axes = T, main = "Probability Map")
+plot(st_geometry(states), add = T, lwd = 1.5)
+```
+
+**Classification Map**
+```{r classified map data}
+rang_clasMAX <- reclassify(rang_probMAX,
+                           filename = "PartRange.clasMAXENT.img",
+                           (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)),
+                           overwrite=TRUE)
+
+plot(rang_clasMAX, legend = T, axes = T, main = "Classification Map")
+plot(st_geometry(states), add = T, lwd = 1.5)
+```
 
 ---
 
@@ -105,6 +227,23 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+mod.cut_MAX <- mod_cutXF$spec_sens
+
+save(mod1.MAX,
+     total_acc,
+     mod.cut_MAX, 
+     rang_probMAX,
+     rang_clasMAX,
+     file = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/RangeData/MAX_Results2.Rdata")
+
+# save(r_dat, r_dom, file = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/RangeData/ShortRangeData.Rdata")
+
+# load(file = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP/data/RangeData/MAX_Results.Rdata")
+
+```
+
 
 ---
 
