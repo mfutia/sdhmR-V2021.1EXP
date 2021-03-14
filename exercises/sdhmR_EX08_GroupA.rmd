@@ -122,7 +122,7 @@ Some of these look like they would only benefit from a smoother at extreme value
 ## Question #3
 
 * Construct a set of GAMs from fully linear to a maximum of 5 splines
-  * Use lowess smoother rather than default spline
+  * Use lowess smoother rather than default spline --> UPDATE: use default splines!
   
 ```{r}
 # GAM model 0: all linear
@@ -134,18 +134,16 @@ Some of these look like they would only benefit from a smoother at extreme value
 
 ```{r}
 # GAM model 1: 2 smoothers
-mod1.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av, span=0.5) + lo(prad_sw_di, span=0.5) + lo(prec_w_hal, span=0.5) + lo(rough_1k, span=0.5) + lo(tmax_s_hal, span=0.5) + lo(topos, span=0.5), family = binomial, data = tr_RANG)
+mod1.GAM_RANGE <- gam(RANG106 ~ etpt_5 + s(mind_yr_av, 2) + s(prad_sw_di, 2) + s(prec_w_hal, 2) + s(rough_1k, 2) + s(tmax_s_hal, 2) + s(topos, 2), family = binomial, data = tr_RANG)
 
 summary(mod1.GAM_RANGE)
 ```
 
-I only used smoothers on the variables listed above, not etpt_5. It looks like span is supposed to range from 0 to 1, so I set it to 0.5 here for 2 smoothers/neighborhoods. 
-
-
+I only used smoothers on the variables listed above, not etpt_5. 
 
 ```{r, warning=FALSE}
 # GAM model 2: smoothers=3
-mod2.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av,span=0.33) + lo(prad_sw_di,0.33) + lo(prec_w_hal,0.33) + lo(rough_1k,0.33) + lo(tmax_s_hal,0.33) + lo(topos,0.33), family = binomial, data = tr_RANG)
+mod2.GAM_RANGE <- gam(RANG106 ~ etpt_5 + s(mind_yr_av,3) + s(prad_sw_di,3) + s(prec_w_hal,3) + s(rough_1k,3) + s(tmax_s_hal,3) + s(topos,3), family = binomial, data = tr_RANG)
 
 summary(mod2.GAM_RANGE) # model #2 summary
   # for example, if a var. is sign. in both 4 and 5 smoothers, just use 4 for parsimony
@@ -154,14 +152,14 @@ summary(mod2.GAM_RANGE) # model #2 summary
 
 ```{r, message=FALSE, warning=FALSE}
 # GAM model 3: smoothers=4
-mod3.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av,span=0.25) + lo(prad_sw_di,span=0.25) + lo(prec_w_hal,span=0.25) + lo(rough_1k,span=0.25) + lo(tmax_s_hal,span=0.25) + lo(topos,span=0.25), family = binomial, data = tr_RANG)
+mod3.GAM_RANGE <- gam(RANG106 ~ etpt_5 + s(mind_yr_av,4) + s(prad_sw_di,4) + s(prec_w_hal,4) + s(rough_1k,4) + s(tmax_s_hal,4) + s(topos,4), family = binomial, data = tr_RANG)
 
 summary(mod3.GAM_RANGE)
 ```
 
 ```{r}
 # GAM model 4: smoothers=5
-mod4.GAM_RANGE <- gam(RANG106 ~ etpt_5 + lo(mind_yr_av,span=0.2) + lo(prad_sw_di,span=0.2) + lo(prec_w_hal,span=0.2) + lo(rough_1k,span=0.2) + lo(tmax_s_hal,span=0.2) + lo(topos,span=0.2), family = binomial, data = tr_RANG)
+mod4.GAM_RANGE <- gam(RANG106 ~ etpt_5 + s(mind_yr_av,5) + s(prad_sw_di,5) + s(prec_w_hal,5) + s(rough_1k,5) + s(tmax_s_hal,5) + s(topos,5), family = binomial, data = tr_RANG)
 
 summary(mod4.GAM_RANGE)
 ```
@@ -389,7 +387,7 @@ gam.pred4 <- predict(mod4.GAM_RANGE, type = "response")
   all.acc # examine - usually just report the cvpred (cross-validated). Resub metrics may have a false sense of security
 ```
   
-Model 2 is my top pick-- it's consistently in the top few models based on these criteria, especially within the set of cross-validated metrics. Model 4 would also be a good pick but is less parsimonious?
+Model 2 is my top pick-- it's consistently in the top few models based on cross-fold validation. Model 4 would also be a good pick but is less parsimonious? These models are all pretty similar in performance, none are great. 
 
 
 ---
@@ -413,28 +411,11 @@ rang.probGAM
 
 ```
 
-This is running really slowly, and I'm getting a lot of error messages "extrapolation not allowed". Only 
 
 ```{r classified map data}
-# classification raster; bit more complicated 
-#   first determine classification threshold -- 
-  ### get mod.cut value from  mod4.GAM_RANGE (has been over-written since run above)
-
-# perform 10-fold cross-validation
-  glm.cv10 <- CVbinary(mod4.GAM_RANGE, nfolds = 10, print.details = F) # crossval w/10 folds
-
-# examine resubstitution and cross-validation estimates
-  gam.cvpred4 <- glm.cv10$cvhat # assign new name to crossval estimates
-  dat2 <- cbind(spp, tr_RANG[2], gam.pred4, gam.cvpred4) # build dataframe: true data plus the 2 validation s
- 
-  dat4 <- dat2[, c(1:2, 4)] # includes column glm.cvpred = spp, spppres106, and glm.cvpred
-
-# calculate model accuracies; cross-validation
-  mod.cut_final <- optimal.thresholds(dat4, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
-
 #classify 
 rang.clasGAM <- reclassify(rang.probGAM, filename = "range.clas.GAM.img", 
-   (c(0, mod.cut_final[[2]], 0, mod.cut_final[[2]], 1, 1)), overwrite=TRUE)
+   (c(0, mod.cut[[2]], 0, mod.cut[[2]], 1, 1)), overwrite=TRUE)
 
 
 # NOT RUN: basic reclassify based on threshold mod.cut per above
@@ -470,7 +451,6 @@ rang.clasGAM <- reclassify(rang.probGAM, filename = "range.clas.GAM.img",
 ```
 
 
-
 ---
 
 ## Question #6
@@ -489,7 +469,7 @@ setwd(path.mod5.2)
 all.acc_EX08 <- all.acc
 
 # Classification threshold as a stand--alone scalar
-mod.cut.EX08 <- mod.cut_final[[2]]
+mod.cut.EX08 <- mod.cut[[2]]
 
 #plot - also saved this manually
 GAMmaps_EX08

@@ -1,75 +1,68 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "EX11: Boosted Regression Trees "
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1")
 #knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r}
+# below is the recommended class root dir
+path.root <- "~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1"  # typical class root dir
+  path.mod9 <- paste(path.root, "/data/module05.05-BRT", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "")
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
 
-## This exercise links to Module 5.5
-
-Submit the completed exercise to us at:
-
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to:
-* Produce and interpret variable importance plots
-* Build a table of accuracy metrics, and AUC plot
-* Plot map products of the:
-  * (i) probability; and 
-  * (ii) classified distribution model
-  * (Save these two maps as **`.img`** files for use later in the course)
-
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
-
-## The Data
-
-* The dataframe completed in exercise #6.
-
----
+# load libraries now if desired; loaded below when needed
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr) #load tidyverse first or they mask many fx's
+  library(gbm)
+  library(dismo)
+  library(PresenceAbsence)
+  library(sf)
+  
+```
 
 ## Question #1
 
 * Import and explore data
   * **NOTE**:  intent is not to reduce number of variables; that was completed in exercise #5.  Rather, calculate simple descriptive statistics (mean, sd, n) and boxplots
 
-
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# load range-wide training data
+load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/tr_RANG.Rdata")
+
+str(tr_RANG)
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+#pivot for ggplotting/summary 
+tr_RANG_long <- tr_RANG %>% 
+  pivot_longer(etpt_5:topos, names_to = "Variable", values_to = "Value") 
+
+tr_RANG_long %>% group_by(Variable) %>% 
+  summarise(n = n(),
+            mean = mean(Value), 
+            sd = sd(Value), 
+            min = min(Value), 
+            max = max(Value))
+```
+
+```{r}
+#boxplot
+ggplot(tr_RANG_long, aes(y=Value)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales="free") +
+  theme_classic()
+```
+
+Same code as EX 9. 
 
 ---
 
@@ -78,6 +71,51 @@ If King's English interpretation is required, it will go here, after each code c
 * Construct a boosted regression tree (BRT) model using the presence:absence data
 * Build plots of variable importance values
 
+```{r}
+# BRT model formulation. tr_RANG=dat1
+  tr_RANG <- na.omit(tr_RANG) # remove NAs - BRT not picky but drop 'em anyway
+  resp <- paste("as.factor(", colnames(tr_RANG[2]), ")", sep = "") # assign resp to col number
+  n.col <- ncol(tr_RANG) # number of columns
+  pred <- 5:n.col # assign predictors to column numbers 
+```
+
+```{r}
+# BRT model - gbm.y = 2 now (response col). used ROT for LR and TC
+  mod2.RANG.BRT <- gbm.step(data = tr_RANG, gbm.x = pred, gbm.y = 2, family = "bernoulli", 
+    tree.complexity = 4, learning.rate = 0.05, bag.fraction = 0.75, n.folds = 10, 
+    plot.main = TRUE, keep.fold.fit = TRUE)
+```
+
+No optimal solution with d=3 and lr=0.01. Need to play w/ the parameters... I'll increase complexity to 4 (because sample size in the thousands), and increase LR to 0.05. Now it's found an inflection point. 
+
+```{r}
+# examine BRT output
+  mod2.RANG.BRT$contributions # relative variable importance
+```
+
+```{r}
+# examine response:predictor plots
+  par(mfrow = c(3, 4))
+  gbm.plot(mod2.RANG.BRT, n.plots = 7) # response:predictor plots 
+    #these are descriptive: importance of factors depending on preds
+  par(mfrow = c(1, 1))
+```
+
+```{r}
+# search for & examine interactions
+  mod2.int <- gbm.interactions(mod2.RANG.BRT) # examine pairwise interactions
+  mod2.int$rank.list # matrix of 5 top interactions 
+  #mod2.int$interactions # NOT RUN: matrix all pairwise interactions
+```
+
+```{r}
+# plot 2 top pairwise interactions
+  par(mfrow = c(1, 2))
+  gbm.perspec(mod2.RANG.BRT, mod2.int$rank.list[1, 1], mod2.int$rank.list[1, 3], theta = 30)
+  gbm.perspec(mod2.RANG.BRT, mod2.int$rank.list[2, 1], mod2.int$rank.list[2, 3], theta = 30)
+  par(mfrow = c(1, 1))
+```
+
 ---
 
 ## Question #3
@@ -85,6 +123,41 @@ If King's English interpretation is required, it will go here, after each code c
 * Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
+  
+```{r}
+######## START ACCURACY CALCULATIONS, MODEL=BRT
+# build testing dataframe using model predictions
+  modl <- "mod2.RANG.BRT" # add var to keep track of model
+  dat2 <- cbind(modl, tr_RANG[2], mod2.RANG.BRT$fitted, mod2.RANG.BRT$fold.fit) # build dataframe
+  names(dat2)[3:4] <- c("pred", "cvpred") # rename vars
+  head(dat2, 2) # just to see logit scale
+  dat2$cvpred <- exp(dat2$cvpred)/(1 + exp(dat2$cvpred)) # convert from logit
+  head(dat2, 5) # examine prediction dataframe 
+```
+
+```{r}
+# determine best threshold using PresenceAbsence package
+  mod.cut <- optimal.thresholds(dat2, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod.cut # examine
+```
+
+```{r}
+# generate confusion matrix: resub and xfold
+  mod2.cfmatR <- table(dat2[[2]], factor(as.numeric(dat2$pred >= mod.cut$pred)))
+  mod2.cfmatX <- table(dat2[[2]], factor(as.numeric(dat2$cvpred >= mod.cut$cvpred)))
+  mod2.cfmatR # examine
+  mod2.cfmatX # examine 
+```
+
+  
+```{r}
+# calculate model accuracies with standard deviation=F
+  mod2.acc <- presence.absence.accuracy(dat2, threshold = mod.cut$pred, st.dev = F)
+  tss <- mod2.acc$sensitivity + mod2.acc$specificity - 1 # code TSS metric
+  mod2.acc <- cbind(mod2.acc[1:7], tss) # bind all metrics
+  mod2.acc[c(1, 4:5, 7:8)] # examine accuracies
+```
+  
 
 ---
 
@@ -93,6 +166,39 @@ If King's English interpretation is required, it will go here, after each code c
 * Build 2 prediction maps:
   * A raw probability estimate for each cell in the modelling domain; and
   * A classified map based on the selected threshold from Question #3
+  
+```{r}
+# boundaries for pretty maps (see Mod 2.5)
+  setwd(path.gis)
+  states <- st_read(dsn = ".", layer = "na_states_wgs") # import shapefile
+  
+# load raster stack
+  load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM.RData")
+```
+  
+```{r}
+#   ASSUME pred.dom is a raster stack per Module 4.1
+setwd(path.mod9)
+ 
+mod2.RANG.BRTprob <- predict(rangeDOM, mod2.RANG.BRT,
+   n.trees = mod2.RANG.BRT$gbm.call$best.trees, type = "response",
+   filename = "modFprob.RANG.BRT.img")
+
+ mod2.RANG.BRTclas <- reclassify(mod2.RANG.BRTprob, c(0, mod.cut[[2]], 0,
+   mod.cut[[2]], 1, 1))
+ writeRaster(mod2.RANG.BRTclas, filename = "modFclas.RANG.BRT.img", format = "HFA")
+```
+  
+```{r}
+ par(mfrow = c(1, 2))
+  plot(mod2.RANG.BRTprob, legend = T, axes = T, main = "Probability Map") # plot clipped probability map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  plot(mod2.RANG.BRTclas, legend = F, axes = T, main = "Classification Map") # plot clipped classified map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5)  # add state boundaries
+  par(mfrow = c(1, 1))
+  
+  BRTmaps_EX11 <- recordPlot()
+```
 
 ---
 
@@ -105,6 +211,21 @@ If King's English interpretation is required, it will go here, after each code c
 * Save these R objects in a **`.RData`** file
 
 These data will be used again in Module 10, Ensemble Models.
+
+```{r}
+setwd(path.mod9)
+
+# Accuracy metrics as a dataframe
+mod2.acc_EX11 <- mod2.acc
+
+# Classification threshold as a stand--alone scalar
+mod.cut.EX11 <- mod.cut[[2]]
+
+#plot - also saved this manually
+BRTmaps_EX11
+
+save(mod2.acc_EX11, mod.cut.EX11, BRTmaps_EX11, file = "range.BRT_EX11.RData")
+```
 
 ---
 

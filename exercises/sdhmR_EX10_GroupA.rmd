@@ -66,6 +66,7 @@ ggplot(tr_RANG_long, aes(y=Value)) +
 ```
 
 Same code as in exercise 9. 
+
 ---
 
 ## Question #2
@@ -168,8 +169,42 @@ Pinus edulis more likely to be found at higher elevations, and at tmax_s_hal aro
   auc.roc.plot(dat2, color = T) # basic AUC plot; pkg PresenceAbsence 
 ```
 
-Model fit seems alright based on sens/spec, but TSS is really low-- about 50%, same as random chance. AUC also not great, especially for random forest. 
-```{r cross validation}
+Model fit seems alright based on sens/spec, but TSS is really low-- about 50%, same as random chance. AUC also not great, especially for random forest. Modify MAXENT CV code:
+
+```{r}
+  set.seed(1234) # set.seed for repeatability
+  tr_RANG.xf <- sample(rep(c(1:10), length = nrow(tr_RANG))) # vector of random xfolds
+  mod2.predXF <- rep(0, length = nrow(tr_RANG)) # empty vector of 0
+  xfold <- 10 # set No. xfolds
+# simple loop for xfold
+  for (i in 1:xfold) {
+    tr <- tr_RANG[tr_RANG.xf != i, ] # training not eq. i
+    te <- tr_RANG[tr_RANG.xf == i, ] # test eq. i
+    mx <- randomForest(mod.form(tr_RANG, 2, 5), importance = T, 
+    keep.forest = T, data = tr) # maxent model on training
+    mod2.predXF[tr_RANG.xf == i] <- predict(mx, te) # predict to test
+    }
+ head(mod2.predXF) 
+```
+
+
+```{r}
+# calculate model accuracies; cross-validation
+
+spp <- "RANGE106"
+
+dat5 <- cbind(spp, tr_RANG[2],mod2.predXF) # build dataframe: true data plus the 2 validation s
+  head(dat5, 2)
+  
+  mod.cutCV <- optimal.thresholds(dat5, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod1.accCV <- presence.absence.accuracy(dat5, threshold = mod.cutCV$mod2.predXF)
+  tss <- mod1.accCV$sensitivity + mod1.accCV$specificity - 1 # code TSS metric
+  dat5.acc_CV <- cbind(mod1.accCV[1:7], tss) # bind all metrics
+  head(dat5.acc_CV)
+
+```
+
+```{r cross validation - code from online}
 # https://rstudio-pubs-static.s3.amazonaws.com/71575_4068e2e6dc3d46a785ad7886426c37db.html
 
 #make train and test data

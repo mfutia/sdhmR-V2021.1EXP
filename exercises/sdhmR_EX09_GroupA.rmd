@@ -174,7 +174,7 @@ load("~/University of Vermont/Classes/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM
   set.seed(1234) # set.seed for repeatability
   tr_RANG.xf <- sample(rep(c(1:10), length = nrow(tr_RANG))) # vector of random xfolds
   mod2.predXF <- rep(0, length = nrow(tr_RANG)) # empty vector of 0
-  xfold <- 5 # set No. xfolds
+  xfold <- 10 # set No. xfolds
 # simple loop for xfold
   for (i in 1:xfold) {
     tr <- tr_RANG[tr_RANG.xf != i, ] # training not eq. i
