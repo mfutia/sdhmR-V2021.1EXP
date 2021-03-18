@@ -1,58 +1,38 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "Exercise 11 Group A"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r include=F}
+# Load packages
+library(tidyverse)
+library(data.table)
+library(magrittr)
+library(PresenceAbsence) # PresenceAbsence for accuracy metrics
+library(dismo)
+library(gbm)
+library(raster)
+library(sf)
 
-## This exercise links to Module 5.5
+# Set working directories
+path.root <- "C:/Users/mttft/Desktop/UVM/UVM Courses/SDHM_R/sdhmR-V2021.1EXP"
+path.mod2 <- paste(path.root, "/data/module02", sep = "")
+path.figs <- paste(path.root, "/powerpoints/figures", sep = "") 
+path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+path.range <- paste(path.root, "/data/RangeData", sep = "")
 
-Submit the completed exercise to us at:
-
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to:
-* Produce and interpret variable importance plots
-* Build a table of accuracy metrics, and AUC plot
-* Plot map products of the:
-  * (i) probability; and 
-  * (ii) classified distribution model
-  * (Save these two maps as **`.img`** files for use later in the course)
-
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
-
-## The Data
-
-* The dataframe completed in exercise #6.
+# Load CRSs
+setwd(path.root)
+source("r_code/prjs4_sdhmR.r")
+ls(pattern = "prj.")
+```
 
 ---
 
@@ -63,13 +43,30 @@ Remember, you will have been assigned data for *edulis* having one the following
 
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+# load range-wide training data
+load(paste(path.root, "/data/RangeData/ShortRangeData.RData", sep = ""))
+str(r_dat)
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+#pivot for ggplotting/summary 
+r_dat_long <- r_dat %>% 
+  pivot_longer(etpt_5.img:topos.img, names_to = "Variable", values_to = "Value") 
+r_dat_long %>% group_by(Variable) %>% 
+  summarise(n = n(),
+            mean = mean(Value), 
+            sd = sd(Value), 
+            min = min(Value), 
+            max = max(Value))
+```
+
+```{r}
+#boxplot
+ggplot(r_dat_long, aes(y=Value)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales="free") +
+  theme_classic()
+```
 
 ---
 
@@ -78,6 +75,33 @@ If King's English interpretation is required, it will go here, after each code c
 * Construct a boosted regression tree (BRT) model using the presence:absence data
 * Build plots of variable importance values
 
+*Model Formulation*
+```{r}
+r_dat %<>% na.omit()
+resp <- paste("as.factor(", colnames(r_dat[2]), ")", sep = "") # assign resp to col number
+n.col <- ncol(r_dat) # number of columns(11)
+pred <- 5:n.col  # assign predictors to column numbers (5:11)
+```
+
+*Build BRT Model*
+```{r}
+set.seed(1234) 
+date() # "Wed Mar 17 22:54:10 2021"
+mod1.BRT <- gbm.step(data = r_dat,
+                     gbm.x = pred,          # Predictor columns
+                     gbm.y = 2,             # Response column
+                     family = "bernoulli",  # Bernoulli for logistic model
+                     tree.complexity = 4,
+                     learning.rate = 0.001,
+                     bag.fraction = 0.75,   # Proportion of data used for permutations (typically 0.5-0.75)
+                     n.folds = 10,          # Number of folds for cross validation
+                     n.trees = 500,
+                     plot.main = TRUE, 
+                     keep.fold.fit = TRUE)
+date() # "Wed Mar 17 23:03:34 2021"
+```
+
+
 ---
 
 ## Question #3
@@ -85,6 +109,55 @@ If King's English interpretation is required, it will go here, after each code c
 * Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
   * Resubstitution approaches, and
   * A 10-fold cross--validation approach
+
+*Investigate Model Output*
+```{r}
+ls(mod1.BRT)
+
+head(mod1.BRT$fitted)  # model fit values
+
+mod1.BRT$contributions # relative variable importance
+
+mod1.BRT
+```
+
+*Re-substitution*
+```{r}
+modl <- "mod1.BRT" # add var to keep track of model
+dat <- cbind(modl, r_dat[2], mod1.BRT$fitted, mod1.BRT$fold.fit) # build dataframe
+names(dat)[3:4] <- c("pred", "cvpred") # rename vars
+head(dat, 2)
+
+dat$cvpred <- exp(dat$cvpred)/(1 + exp(dat$cvpred)) # convert from logit
+head(dat, 2)
+
+# determine best threshold using PresenceAbsence package
+mod.cut <- optimal.thresholds(dat, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+mod.cut
+
+# generate confusion matrix
+mod.cfmatR <- table(dat[[2]], factor(as.numeric(dat$pred >= mod.cut$pred)))
+mod.cfmatX <- table(dat[[2]], factor(as.numeric(dat$cvpred >= mod.cut$cvpred)))
+mod2.cfmatR
+mod2.cfmatX
+
+# calculate model accuracy with standard deviation=F
+mod.acc <- presence.absence.accuracy(dat, threshold = mod.cut$pred, st.dev = F)
+tss <- mod.acc$sensitivity + mod.acc$specificity - 1
+
+mod.acc <- cbind(mod.acc[1:7], tss) # bind all metrics
+mod.acc[c(1, 4:5, 7:8)]
+
+# plotting AUC
+  auc.roc.plot(dat2, color = T) # basic AUC plot; pkg PresenceAbsence 
+
+```
+
+*10-fold Cross-validation*
+```{r}
+
+```
+
 
 ---
 
