@@ -1,0 +1,170 @@
+---
+title: "Exercise Title Goes Here"
+author: "Eli L. Polzer"
+date: "19 March 2021"
+output: html_document
+---
+
+```{r}
+  path.root <- "C:/Users/epolzer/Documents/sdhmR-V2021.1"
+  path.mod2 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module02", sep = "")
+  path.figs <- paste(path.root, "/sdhmR-V2021.1EXP/Figures", sep = "")
+  path.mod5.5 <- paste(path.root, "/sdhmR-V2021.1EXP/Data/module05.05-BRT", sep = "")
+  path.gis <- paste(path.root, "/sdhmR-V2021.1EXP/Data/gis_layers", sep = "")
+
+# load libraries now if desired; loaded below when needed
+  library(gbm)
+  library(dismo)
+  library(PresenceAbsence)
+```
+
+---
+
+## The Data
+
+* The dataframe completed in exercise #6.
+
+---
+
+## Question #1
+
+* Import and explore data
+  * **NOTE**:  intent is not to reduce number of variables; that was completed in exercise #5.  Rather, calculate simple descriptive statistics (mean, sd, n) and boxplots
+
+
+```{r}
+  setwd(path.mod2) 
+  dat1 <- read.csv("pied.trTOPO.csv", header = T) # load training data
+  dim(dat1)
+  table(dat1$RANG106) # examine data 
+  head(dat1)
+  
+  dat1 <- na.omit(dat1) # remove NAs
+  resp <- paste("as.factor(", colnames(dat1[2]), ")", sep = "") # assign resp to col number
+  n.col <- ncol(dat1) # number of columns
+  pred <- 5:11 # assign predictors to column numbers
+  
+  ## Perform simple statistics:
+  aggregate(dat1 [, 5:11], list(presabs = dat1$RANG106), FUN = mean, na.rm = T) 
+  aggregate(dat1 [, 5:11], list(presabs = dat1$RANG106), FUN = median, na.rm = T) 
+  
+  ## Create simple boxplots:
+  par(mfrow = c(1,boxplot(dat1$etpt_5.img ~ dat1$RANG106,xlab = "Presence:Absence", ylab = "ETPT5")))
+  par(mfrow = c(1,boxplot(dat1$exp1nrm.img ~ dat1$RANG106,xlab = "Presence:Absence", ylab = "EXP1")))
+  par(mfrow = c(1,boxplot(dat1$mind_yr_av.img ~ dat1$RANG106,xlab = "Presence:Absence", ylab = "MIND")))
+  par(mfrow = c(1,boxplot(dat1$prad_sw_di.img ~ dat1$RANG106,xlab = "Presence:Absence", ylab = "PRAD")))
+  par(mfrow = c(1,boxplot(dat1$prec_w_hal.img ~ dat1$RANG106,xlab = "Presence:Absence", ylab = "PRECHAL")))
+  par(mfrow = c(1,boxplot(dat1$rough_1k.img ~ dat1$RANG106,xlab = "Presence:Absence", ylab = "ROUGH")))
+  par(mfrow = c(1,boxplot(dat1$tmax_s_hal.img ~ dat1$RANG106,xlab = "Presence:Absence", ylab = "TMAXHAL")))
+```
+
+---
+
+## Question #2
+
+* Construct a boosted regression tree (BRT) model using the presence:absence data
+* Evaluate
+```{r}
+  mod2.BRT <- gbm.step(data = dat1, gbm.x = pred, gbm.y = 2, family = "bernoulli", 
+    tree.complexity = 3, learning.rate = 0.1, bag.fraction = 0.75, n.folds = 10, 
+    plot.main = TRUE, keep.fold.fit = TRUE)
+  
+  ls(mod2.BRT) # examine BRT objects
+  head(mod2.BRT$fitted) # model fit values
+  head(dat1$RANG106) # observed values
+  mod2.BRT$contributions # relative variable importance
+
+  par(mfrow = c(2, 4))
+  gbm.plot(mod2.BRT, n.plots = 7) # response:predictor plots 
+  par(mfrow = c(1, 1))
+
+  mod2.int <- gbm.interactions(mod2.BRT) # examine pairwise interactions
+  mod2.int$rank.list # matrix of 5 top interactions 
+
+  par(mfrow = c(1, 3)) # pairwise interactions
+  gbm.perspec(mod2.BRT, mod2.int$rank.list[1, 1], mod2.int$rank.list[1, 3], theta = 30)
+  gbm.perspec(mod2.BRT, mod2.int$rank.list[2, 1], mod2.int$rank.list[2, 3], theta = 30)
+```
+
+---
+
+## Question #3
+
+* Calculate accuracy metrics (as in Module 3.2 and 3.3, Analytical Intermission) using:
+  * Resubstitution approaches, and
+  * A 10-fold cross--validation approach
+```{r}
+  modl <- "mod2.BRT" # add var to keep track of model
+  dat2 <- cbind(modl, dat1[2], mod2.BRT$fitted, mod2.BRT$fold.fit) # build dataframe
+  names(dat2)[3:4] <- c("pred", "cvpred") # rename vars
+  head(dat2, 2) # just to see logit scale
+  dat2$cvpred <- exp(dat2$cvpred)/(1 + exp(dat2$cvpred)) # convert from logit
+  head(dat2, 2) # examine prediction dataframe 
+
+  mod.cut <- optimal.thresholds(dat2, opt.methods = c("ObsPrev")) # threshold=PREVALENCE
+  mod.cut
+
+  mod2.cfmatR <- table(dat2[[2]], factor(as.numeric(dat2$pred >= mod.cut$pred))) # generate confusion matrix
+  mod2.cfmatX <- table(dat2[[2]], factor(as.numeric(dat2$cvpred >= mod.cut$cvpred)))
+  mod2.cfmatR 
+  mod2.cfmatX 
+
+  mod2.acc <- presence.absence.accuracy(dat2, threshold = mod.cut$pred, st.dev = F) # calculate model accuracies with std dev=F
+  tss <- mod2.acc$sensitivity + mod2.acc$specificity - 1 # code TSS metric
+  mod2.acc <- cbind(mod2.acc[1:7], tss) # bind all metrics
+  mod2.acc[c(1, 4:5, 7:8)] # examine
+  
+  auc.roc.plot(dat2, color = T) # basic AUC plot
+```
+
+---
+
+## Question #4
+
+* Build 2 prediction maps:
+  * A raw probability estimate for each cell in the modelling domain; and
+  * A classified map based on the selected threshold from Question #3
+```{r}
+  setwd(path.mod2)
+  pied.topoDOM <- get(load("pied.topoDOM.RData")) # raster stack
+  
+  setwd(path.gis)
+  states <- st_read(dsn = ".", layer = "na_states_wgs") # import shapefile
+  
+  mod2.BRTprob = predict(pied.topoDOM, mod2.BRT, # predict
+  n.trees = mod2.BRT$gbm.call$best.trees, type = "response", 
+  filename = "modFprob.BRT.img", overwrite = T)
+  plot(mod2.BRTprob, legend = T, axes = T, main = "Probability Map") # plot clipped probability map
+  plot(sf::st_geometry(states), add = T, lwd = 1.5) # add state boundaries
+  
+  mod2.BRTclas = reclassify(mod2.BRTprob, c(0, mod.cut[[2]], 0, # reclassify
+  mod.cut[[2]], 1, 1))
+  plot(mod2.BRTclas, legend = F, axes = T, main = "Classification Map") # plot clipped classified map
+   plot(sf::st_geometry(states), add = T, lwd = 1.5)  # add state boundaries
+```
+
+---
+
+## Question #5
+
+* Save your data as R objects:
+  * Accuracy metrics as a dataframe;
+  * Classification threshold as a stand--alone scalar
+  * Both prediction maps as **`.img`** format
+* Save these R objects in a **`.RData`** file
+
+These data will be used again in Module 10, Ensemble Models.
+```{r}
+  mod2.BRTmaps_HW11 <- recordPlot()
+  setwd(path.mod5.5)
+  mod2.acc_HW11 <- mod2.acc # accuracy metrics as a dataframe
+  mod.cut_HW11 <- mod.cut[[2]] # classification threshold as stand-alone scalar
+  mod2.BRTmaps_HW11 # plot
+  save(mod2.acc_HW11, mod.cut_HW11, mod2.BRTmaps_HW11, file = "BRT_HW11RData")
+```
+
+---
+
+## The End
+
+---
