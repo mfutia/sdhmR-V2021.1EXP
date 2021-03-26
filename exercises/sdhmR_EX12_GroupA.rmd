@@ -5,18 +5,21 @@ date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(cache = TRUE)
+```
+
 ```{r global_options, include=FALSE}
 knitr::opts_knit$set(root.dir = "~/sdhmR-V2021.1")
-knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
+knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE, cache = TRUE)
 ```
 
 ```{r}
 path.root <-"~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1"
   path.mod06 <- paste(path.root, "/data/module06-EnMod", sep = "")
-  path.figs <- paste(path.root, "/powerpoints/figures", sep = "")
+  path.figs <- "~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module06-EnMod/maps" #changed from class notes
   path.gis <- paste(path.root, "/data/gis_layers", sep = "")
-  path.github <- "~/sdhmR-V2021.1/exercises"
-
+  
 # load libraries
   library(raster)
   options("rgdal_show_exportToProj4_warnings"="none") # run this before library(rgdal)
@@ -202,7 +205,7 @@ load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.04
   plot(prob.sd, axes = T, main = "SD probability map") # plot classified map
   par(mfrow = c(1, 1))
   
-  Mean-SDMaps_EX12 <- recordPlot()
+  Mean_SDMaps_EX12 <- recordPlot()
   
 ```
 
@@ -236,7 +239,6 @@ ConcordanceMap_EX12 <- recordPlot()
   ConcordanceMapsMatrix_EX12 <- recordPlot()
 
 ```
-# Question: did I include the right maps? ... Should the last one just include sum=3 and sum=5?
 
 ---
 
@@ -278,6 +280,6 @@ setwd(path.mod06)
 
 # individual-model plots saved above
 
-save(prob.dom, probSTD.dom, prob.mean, prob.sd, clas.dom, clas.sum, Mean-SDMaps_EX12, ConcordanceMap_EX12, ConcordanceMapsMatrix_EX12, file = "RANGE.ensemble.dom.RData")
+save(prob.dom, probSTD.dom, prob.mean, prob.sd, clas.dom, clas.sum, Mean_SDMaps_EX12, ConcordanceMap_EX12, ConcordanceMapsMatrix_EX12, file = "RANGE.ensemble.dom.RData")
 
 ```
