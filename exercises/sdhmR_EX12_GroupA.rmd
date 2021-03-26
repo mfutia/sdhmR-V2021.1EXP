@@ -1,53 +1,33 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "EX12 Group A"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
-<!-- These are global options  
-       set root directory here 
-       NOTE mine is active; yours is commented out
-       change the path to reflect your CPU,
-       then comment out or delete mine
---> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "~/sdhmR-V2021.1")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r}
+path.root <-"~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1"
+  path.mod06 <- paste(path.root, "/data/module06-EnMod", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "")
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
+  path.github <- "~/sdhmR-V2021.1/exercises"
 
-## This exercise links to Module 6
+# load libraries
+  library(raster)
+  options("rgdal_show_exportToProj4_warnings"="none") # run this before library(rgdal)
+  library(rgdal)
+  library(gam)
+  library(randomForest)   
+  library(dismo)
+  library(gbm)
+  library(sf)
+```
 
-Submit the completed exercise to us at:
-
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to: 
-
-* Build ensemble map products of the $\bar{x}$ and $SD$ probabilities 
-* Build ensemble concordance map products of 3, 5, and union of all models 
-* Build tables of frequencies: 
-  * Presences (ie, sum the cells of classified presence for the 3, 5, and union ensembles) 
-  * Concordances (remember, this is a measure of "how much !!) 
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
-
----
 
 ## The Data
 
@@ -56,6 +36,33 @@ Remember, you will have been assigned data for *edulis* having one the following
   * The (i) prediction; and (ii) classified maps
 
 If you did **NOT** save these you're in a bit of trouble ...
+
+```{r}
+# LR 
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.01-LR/range.LR_EX07.RData")
+
+# GAM
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.02-GAM/range.GAM_EX08.RData")
+
+# MAXENT
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.03-MAX/range.MAX_EX09.RData")
+
+# Random Forest
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.04-RF/range.RF_EX10.RData")
+
+# BRT
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.05-BRT/range.BRT_EX11.RData")
+```
+
+```{r}
+# training data
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module02/tr_RANG.Rdata")
+
+# raster stack of predictors - only the ones included in the modeling process
+# load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module02/rangeDOM.RData") 
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.04-RF/rangeDOM_01.RData") 
+```
+
 
 ---
 
@@ -67,14 +74,169 @@ If you did **NOT** save these you're in a bit of trouble ...
   * "Clip" all these maps by the bounding boxes created earlier (see Module 2.3.3 for refresher, if needed)
   * Output these map products as **`.img`** files
 
+### Individual maps
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+######## START PREDICTION PROBABILITY AND CLASSIFED MAPS
+
+# LR prediction and classification
+  setwd("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module06-EnMod/maps")
+  modFprob.LR <- predict(rangeDOM_01, mod1.LR.RANG, filename="modFprob.LR.img", type = "response", fun = predict, index = 2, overwrite = T)
+  modFclas.LR <- reclassify(modFprob.LR, (c(0, mod.cut_EX07, 0, mod.cut_EX07, 1, 1)), filename="modFclas.LR.img", overwrite = T)
+
+# giggle plots
+  par(mfrow = c(1, 2))
+  plot(modFprob.LR, axes = T, main = "LR probability map") # plot probability map
+  plot(modFclas.LR, axes = T, main = "LR classfied map") # plot classified map
+  par(mfrow = c(1, 1))
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+```{r}
+# GAM prediction and classification
+  setwd(paste(path.mod06, "/maps", sep = ""))
+  library(gam)
+  modFprob.GAM <- predict(rangeDOM_01, mod2.GAM_RANGE, filename = "modFprob.GAM.img", 
+    type = "response", fun = predict, index = 2, overwrite = T)
+  modFclas.GAM <- reclassify(modFprob.GAM, filename = "modFclas.GAM.img", 
+    (c(0, mod.cut.EX08, 0, mod.cut.EX08, 1, 1)), overwrite = T) 
+
+  par(mfrow = c(1, 2))
+  plot(modFprob.GAM, axes = T, main = "GAM probability map") # plot probability map
+  plot(modFclas.GAM, axes = T, main = "GAM classfied map") # plot classified map
+  par(mfrow = c(1, 1))
+```
+```{r}
+## MAXENT prediction and classification
+  setwd(paste(path.mod06, "/maps", sep = ""))
+  library(dismo) # load library
+  modFprob.MAX <- predict(mod2.MAX_RANG, rangeDOM_01, filename = "modFprob.MAX.img", overwrite = T)  
+  modFclas.MAX <- reclassify(modFprob.MAX, filename = "modFclas.MAX.img", 
+    c(0, mod.cut.EX09, 0, mod.cut.EX09, 1, 1), overwrite = T) # clas map
+
+# giggle plots
+  par(mfrow = c(1, 2))
+  plot(modFprob.MAX, axes = T, main = "MAX probability map") # plot probability map
+  plot(modFclas.MAX, axes = T, main = "MAX classfied map") # plot classified map
+  par(mfrow = c(1, 1))
+
+```
+
+```{r}
+  # RF prediction and classification
+  setwd(paste(path.mod06, "/maps", sep = ""))
+  library(randomForest)  # load library
+  modFprob.RF <- predict(rangeDOM_01, mod1.RF_RANG, filename = "modFprob.RF.img", 
+    type = "prob", fun = predict, index = 2, overwrite = T) # prob map
+  modFclas.RF <- reclassify(modFprob.RF, filename = "modFclas.RF.img", 
+    (c(0, mod.cut.EX10, 0, mod.cut.EX10, 1, 1)), overwrite = T) # class map
+
+# giggle maps
+  par(mfrow = c(1, 2))
+  plot(modFprob.RF, axes = T, main = "RF probability map") # plot probability map
+  plot(modFclas.RF, axes = T, main = "RF classfied map") # plot classified map
+  par(mfrow = c(1, 1))
+```
+
+```{r}
+## BRT prediction and classification
+  setwd(paste(path.mod06, "/maps", sep = ""))
+  library(dismo)
+  library(gbm)
+  modFprob.BRT <- predict(rangeDOM_01, mod2.RANG.BRT, n.trees = mod2.RANG.BRT$gbm.call$best.trees, 
+    type = "response", filename = "modFprob.BRT.img", overwrite = T) # prob map
+  modFclas.BRT <- reclassify(modFprob.BRT, c(0, mod.cut.EX11, 0, mod.cut.EX11, 1, 1), 
+    filename = "modFclas.BRT.img", overwrite = T) # clas map
+
+# giggle maps
+  par(mfrow = c(1, 2))
+  plot(modFprob.BRT, axes = T, main = "BRT probability map") # plot probability map
+  plot(modFclas.BRT, axes = T, main = "BRT classfied map") # plot classified map
+  par(mfrow = c(1, 1))
+```
+
+### Ensemble maps: SDHM mean and sd probabilities
+
+```{r}
+######## START ENSEMBLE PROCESS
+# create stacks of probability and classification raster layers
+  prob.dom <- stack(modFprob.LR, modFprob.GAM, modFprob.MAX, modFprob.RF, modFprob.BRT) # raster stack prob maps
+  prob.dom # examine
+```
+
+```{r}
+  clas.dom <- stack(modFclas.LR, modFclas.GAM, modFclas.MAX, modFclas.RF, modFclas.BRT) # raster stack classified maps
+  clas.dom # examine
+```
+
+```{r}
+# standardize all prediction maps 0-1.0
+  maxValue(prob.dom) # extract max value for each prob map
+  layers <- {} # initialize (empty) list of raster layers
+  for (i in 1:length(names(prob.dom))) {
+    m1 <- prob.dom[[i]] # get a prob map
+    m2 <- 1/maxValue(prob.dom[[i]]) * prob.dom[[i]] # standardize all probs to max=1
+    m3 <- unlist(strsplit(names(prob.dom[[i]]), "[.]")) # split prob layer name apart
+    names(m2) <- paste(m3[1], "STD.", m3[2], sep = "")  # assign name to raster value
+    assign(paste(m3[1], "STD.", m3[2], sep = ""), m2) # assign new name to standardized layer
+    layers <- c(layers, get(paste(m3[1], "STD.", m3[2], sep = "")))
+  }
+  probSTD.dom <- stack(layers)
+  maxValue(probSTD.dom) # extract max value for each prob map; standardized ? -> yes
+
+```
+
+```{r}
+####
+# descriptive stats on raster maps: mean & sd
+  prob.mean <- mean(prob.dom) # mean prob map
+  prob.sd <- calc(prob.dom, sd) # sd prob map
+  
+# access min max values of descriptive stat raster
+  maxValue(prob.mean) # max pr.mean
+  minValue(prob.mean) # min pr.mean
+  probSTD.mean <- mean(probSTD.dom) # mean standardized prob map
+  clas.sum <- sum(clas.dom) # sum of models by cell = concordance maps (sum=5 means all 5 predict presence)
+
+# giggle plots: mean & sd
+  par(mfrow = c(1, 2))
+  plot(probSTD.mean, axes = T, main = "STD. MEAN probability map") # plot probability map
+  plot(prob.sd, axes = T, main = "SD probability map") # plot classified map
+  par(mfrow = c(1, 1))
+  
+  Mean-SDMaps_EX12 <- recordPlot()
+  
+```
+
+### SDHM concordance maps of 5, 3, and union of all SDHM overlaps
+
+```{r}
+# concordance of all overlaps
+clas.sum <- sum(clas.dom) # sum of models by cell = concordance maps (sum=5 means all 5 predict presence)
+plot(clas.sum, axes = T, main = "Concordance CLASS map: Ramp") # plot concordance map
+
+ConcordanceMap_EX12 <- recordPlot()
+```
+
+```{r}
+# 6 classification union maps
+  clas.sumU <- clas.sum > 0 # sum where No. models =union
+  clas.sum1 <- clas.sum > 1 # sum where No. models =2+
+  clas.sum2 <- clas.sum > 2 # sum where No. models =3+
+  clas.sum3 <- clas.sum > 3 # sum where No. models =4+
+  clas.sum4 <- clas.sum > 4 # sum where No. models =5 
+
+# giggle plots
+  par(mfrow = c(2, 3))
+  plot(clas.sum, axes = T, main = "Concordance: Ramp")  # RAMP concordance map
+  plot(clas.sumU, axes = T, main = "Concordance: Union")  # UNION concordance map
+  plot(clas.sum1, axes = T, main = "Concordance: 2+")  # 2+ concordance map
+  plot(clas.sum2, axes = T, main = "Concordance: 3+")  # 3+ concordance map
+  plot(clas.sum3, axes = T, main = "Concordance: 4+")  # 4+ concordance map
+  plot(clas.sum4, axes = T, main = "Concordance: 5") # 5 concordance map
+  
+  ConcordanceMapsMatrix_EX12 <- recordPlot()
+
+```
+# Question: did I include the right maps? ... Should the last one just include sum=3 and sum=5?
 
 ---
 
@@ -82,11 +244,26 @@ If King's English interpretation is required, it will go here, after each code c
 
 * Calculate the frequencies of "presence" in each of the 5 SDHMs
 
+```{r}
+ clas.freqM <- freq(clas.dom) # [0,1] freqs by clas map; rtns list
+  clas.freqM # examine freqs for5 models
+```
+
+The highest proportion of predicted presences occurred in the generalized linear regression and MAXENT models. The lowest was found in the boosted regression tree model. 
+
 ---
+
 
 ## Question #3
 
 * Tally the frequencies of concordance after "clipping" and compare with above
+
+```{r}
+ clas.freqS <- data.frame(freq(clas.sum)) # freqs of concordance of models
+  clas.freqS # examine; value is concordance freq
+  clas.freqS$count[6]/sum(clas.freqS$count[2:6]) # prop. models concordance=5 
+```
+Roughly half of the number of "presence" points in the summary above were concordant between all 5 models (275,000 of 500,000 points). 
 
 ---
 
@@ -96,8 +273,11 @@ If King's English interpretation is required, it will go here, after each code c
   * All ensemble prediction maps as **`.img`** format
 * Save these R objects in a **`.RData`** file as well
 
----
+```{r}
+setwd(path.mod06)
 
-## The End
+# individual-model plots saved above
 
----
+save(prob.dom, probSTD.dom, prob.mean, prob.sd, clas.dom, clas.sum, Mean-SDMaps_EX12, ConcordanceMap_EX12, ConcordanceMapsMatrix_EX12, file = "RANGE.ensemble.dom.RData")
+
+```
