@@ -1,8 +1,10 @@
 ---
-title: "Exercise Title Goes Here"
-author: "Your Name Goes Here"
+title: "EX13 Group A: Field Campaigns"
+author: "Mia McReynolds, Eli Polzer, Matt Futia"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- These are global options  
@@ -12,47 +14,45 @@ output: html_document
        then comment out or delete mine
 --> 
 ```{r global_options, include=FALSE}
-knitr::opts_knit$set(root.dir = "~/words/classes/sdmR_ALLversions/sdhmR-V2020.2")
-#knitr::opts_knit$set(root.dir = "~/sdhmR-V2020.2")
+knitr::opts_knit$set(root.dir = "~/sdhmR-V2021.1")
 knitr::opts_chunk$set(warning=FALSE,error=TRUE,message=FALSE)
 ```
 
----
+```{r}
+path.root <- "~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1"
+  
+# below is the recommended class root dir
+  #path.root <- "~/sdhmR-V2021.1"  # typical class root dir
+  path.mod02 <- paste(path.root, "/data/module02", sep = "")
+  path.mod06 <- paste(path.root, "/data/module06-EnMod", sep = "")
+  path.mod07 <- paste(path.root, "/data/module07-FieldSample", sep = "")
+  path.figs <- paste(path.root, "/powerpoints/figures", sep = "")
+  path.gis <- paste(path.root, "/data/gis_layers", sep = "")
 
-## This exercise links to Module 7
+# load libraries
+  library(dismo)
+  library(raster)    # FXNS: raster, rasterize, crop
+  library(sampling)  # FXNS: strata, getdata
+  library(sf)  # FXNS: st_read, st_transform, st_drop_geometry, st_geometry, 
+               #       st_as_sf, st_write
 
-Submit the completed exercise to us at:
+# source course CRSs
+  setwd(path.root)
+  source("r_code/prjs4_sdhmR.r") # source course CRSs
+  ls(pattern = "prj.") # should be 5 prj.* objects
 
-* t.edwards@usu.edu 
-* eric_tsakiris@fws.gov  
-
----
-
-## Context
-
-The data are of the *Pinus edulis* Common piñon, the species you dealt with in Exercise #3 -- #5.  This exercise relies on the dataframe you generated in exercise #6.  Hopefully you saved those combined presence:absence dataframe, with the reduced variables you begin SDHM model construction with, or regrettably you will need to return to exercise #6 and re--build that dataframe.
-
-The goal is to: 
-
-* Build a dataframe of [X,Y] points selected for a field sample campaign
-  * (You need only show the first 10 lines of the dataframe)
-* Build ensemble concordance map products of 3, 5, and union of all models 
-* Build tables of frequencies: 
-  * Presences (ie, sum the cells of classified presence for the 3, 5, and union ensembles) 
-  * Concordances (remember, this is a measure of "how much !!) 
-
-Remember, you will have been assigned data for *edulis* having one the following four discrete labels:
-
-* **Seedlings**:  these data indicate spatial locations where seedlings of the tree have been found
-* **Mortality**: these data indicate spatial locations where mortality has been observed
-* **Persistence**: these data have no observed mortality or seedling at given spatial locations
-* **Range**: the total dataset, including all spatial locations of seedlings, mortality, and persistence
+  # some color ramps for plots
+  setwd(path.gis)
+  load("map.colors.RData") # load map colors
+  ls(pattern = "pal") # examine available color ramps
+  pal <- pal.BRN # tmp assignment color palette
+```
 
 ---
 
 ## There Are Different Objectives for Each of the Group Labels -- Pay Attention Here !!
 
-* **RANG** => SRS based on bounding box, with an $n$ = 250
+* **RANG** => SRS based on bounding box, with an $n$ = 250 (the rectangle - larger than buffered pts distribution)
 * **SEED** => SRS based on species modelling, with an $n$ = 250
 * **PERS**=> SRS based on concordance strata, within bounding box, with $n$'s of:
   * N[0,1,2,3,4,5] = c(25, 45, 45, 45, 45, 45)
@@ -67,7 +67,38 @@ Remember, you will have been assigned data for *edulis* having one the following
   * The previously constructed SDHM models, for your group label, and 
   * The (i) prediction; and (ii) classified maps
 
-If you did **NOT** save these you're in a bit of trouble ...
+```{r}
+# load individual models
+
+# LR 
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.01-LR/range.LR_EX07.RData")
+
+# GAM
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.02-GAM/range.GAM_EX08.RData")
+
+# MAXENT
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.03-MAX/range.MAX_EX09.RData")
+
+# Random Forest
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.04-RF/range.RF_EX10.RData")
+
+# BRT
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module05.05-BRT/range.BRT_EX11.RData")
+
+# load ensemble model
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module06-EnMod/RANGE.ensemble.dom.RData", verbose = T)
+```
+
+```{r}
+# get buffered points bounding box (raster) = pied.range.bufR
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module02/pied.framesR.RData",verbose=T)
+
+# get pres/abs points = range_PPsA_ShortData
+load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module02/range_pres_psu_data.RData")
+
+head(range_PPsA_ShortData, 2)
+
+```
 
 ---
 
@@ -77,19 +108,125 @@ If you did **NOT** save these you're in a bit of trouble ...
 
 
 ```{r}
-# code for the question goes inside chunks, if part of the exercise solution.
-#  If not part of the exercise questions delete this.
-#  NOTE: do NOT answer all questions from within the same chunk
+########  START FISHNET EXTRACTIONS BASED ON P/As
+# load study region fishnet & crop to spp bbox
+  load("~/University of Vermont/03 Coursework/sdhmR/sdhmR-V2021.1/data/module02/pied.range.fnet.RData",verbose=T) 
+
+# fnet 1 is the cropped fishnet -- mine has more cols than required
+pied.range.fnetSP <- as_Spatial(pied.range.fnetSF) 
+fnet1 <- crop(rasterize(pied.range.fnetSP, rangeDOM[[1]]), pied.range.bufR)
+fnet1
 ```
 
-**YET ANOTHER NOTE RELATED TO CODE:**  
-If King's English interpretation is required, it will go here, after each code chunk.
+
+```{r}
+# giggle plot
+  plot(pied.range.bufR, legend = F)
+  points(range_PPsA_ShortData$wgs_x, range_PPsA_ShortData$wgs_y, pch = 20, col = "white") # add spp P/A points
+```
+
+```{r}
+# create dataframe from raster - has more cols than the example
+  fnet2 <- as.data.frame(fnet1) # convert raster to dataframe
+  head(fnet2) # examine & confirm change: This is the fishnet within the red spp bounding box
+```
+
+
+```{r}
+# remove duplicate FNETIDs from spp P/A data
+  range.nodupPA <- subset(range_PPsA_ShortData, !duplicated(range_PPsA_ShortData[, 1])) # remove duplicate FNETIDs
+  head(range.nodupPA, 2) # examine; note other variables
+```
+
+```{r}
+# remove spp P/A from fishnet; fnet3 will be sample frame for field test sample draw
+  fnet3 <- as.data.frame(fnet2[!fnet2$FNETID %in% range.nodupPA$FNETID, ]) # select FNETID w/out range P/A
+
+# import fishnet dataframe w/ [X,Y] = fnet 2 from above
+
+# create final DF for sample selection: FNETID and cell X & Y
+  fnet.s1 <- merge(fnet2, fnet3, by = c("FNETID", "cell.wgs_x", "cell.wgs_y", "ID")) # for sample selection - uses the smaller df for left side of join
+  head(fnet.s1, 2) # examine
+ 
+  dim(fnet.s1)[1] # should = dim(fnet3)[1] below
+  dim(fnet3)[1] # should = dim(fnet.s1)[1] above -- good.
+```
+
+```{r}
+# ######## BUILD SAMPLE FRAMES FOR FIELD SAMPLE EXTRACTIONS
+# # build stacks
+# #   objects from "ensemble.dom.RData" loaded earlier => prob.mean, probSTD.mean, clas.sum
+#   sampl.dom_RANGE <- stack(prob.mean, prob.sd, clas.sum)
+#   names(sampl.dom_RANGE) <- c("prob.mean", "prob.SD", "clas.sum")
+#   sampl.dom_RANGE  # examine
+# 
+# # extract data from rasters & bind to sample dataframe
+#   ext.1 <- extract(sampl.dom_RANGE, fnet.s1[, 2:3]) # basic extract
+#   fr.2sample <- cbind(fnet.s1, ext.1) # bind extracted values to sample DF
+#   head(fr.2sample, 2) # examine
+#   # FNETID fnetwgs.buf cell.wgs_x cell.wgs_y  prob.mean probSTD.mean clas.sum cp.statesR
+#   # 1  65993          NA  -111.5269    40.4712 0.01449531   0.01449811        0          1
+#   # 2  65994          NA  -111.5186    40.4712 0.06004939   0.06008573        0          1
+```
+
+```{r}
+######## START SAMPLE EXTRACTIONS
+
+#### srs extraction includes bbox
+# srs draw from sample frame
+  set.seed (1234)  # to ensure repeatability
+  sample.size = 250  # set sample size to select
+  srs1 <- fnet.s1[sample(1:nrow(fnet.s1), sample.size), ] # simple random sample
+  head(srs1, 2) # examine
+  dim(srs1)
+```
+
+```{r}
+# giggleplot includes bbox
+
+  pin.fig <- c(5.373, 3.623)  # fig size
+  par(pin = pin.fig)  # set fig par
+
+  plot(pied.range.bufR, col = "gray90", legend = F, xlab = "Longitude", ylab = "Latitude")  # spp bbox
+  points(range_PPsA_ShortData$wgs_x, range_PPsA_ShortData$wgs_y, pch = 15, col="darkolivegreen") # add spp P/S points
+  points(srs1$cell.wgs_x, srs1$cell.wgs_y, pch = 15, col="coral2") # add spp P/S points
+  legend("bottomleft", title = "SRS sample points",
+    legend = c("Species domain", "Presence points", "SRS sample points"), bg = "white",
+    cex = .75, bty = "0", inset = c(0.05, 0.05), pt.cex=1, pch = c(15, 15),
+    col = c("gray90", "darkolivegreen", "coral2"))
+  
+samplingpoints_EX13 <- recordPlot()
+```
 
 ---
 
 ## Question #2
 
 * Export field sample points as a shapefile
+
+```{r}
+######## START EXPORT TO RDATA & ESRI FORMAT
+
+# I changed this code to just export the points, not the concordance df values
+
+srs1_points <- srs1[,1:3]
+  
+# ESRI not happy with R naming conventions; easier to change here
+  names(srs1_points) <- c("FNETID", "wgs84_x", "wgs84_y")
+
+# convert to sf
+  srs1_pointsSF <- st_as_sf(srs1_points, coords = c("wgs84_x", "wgs84_y"), 
+    crs = prj.wgs84, remove = F) # remove=F to retain input x,y
+  head(srs1_pointsSF, 2) # examine & check crs
+```
+
+```{r}
+# export sf as esri shapefile
+  setwd(path.mod07) # output path
+  st_write(srs1_pointsSF, dsn = ".", layer = "srs1_points_RANGE", 
+    driver = "ESRI Shapefile", delete_dsn = T) # output shapefile
+```
+
 
 ---
 
@@ -99,6 +236,18 @@ If King's English interpretation is required, it will go here, after each code c
   * All field campaign maps as R spatial object
   * All field campaign maps as **`.img`** format
 * Save these R objects in a **`.RData`** file as well
+
+```{r}
+setwd(path.mod07)
+
+# export sf & df as RData
+  srs1_pointsDF <- st_drop_geometry(srs1_pointsSF) # drop geometry & build df
+  head(srs1_pointsDF, 2) # examine dataframe
+  save(srs1_pointsSF, srs1_pointsDF, file = "srs1_points_RANGE.RData")
+  
+  save(samplingpoints_EX13, file="srs1_map_RANGE.RData")
+```
+
 
 ---
 
